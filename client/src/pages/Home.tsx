@@ -44,15 +44,15 @@ const CONTACTS: PropertyContact[] = [
   { property: "River Pointe",        manager: "Stephanie Delong",       email: "stephanie@apartmentcorp.com",      ext: "224", region: "Region 1", regionalManager: "JR Rolon",          regionalEmail: "jrrolon@apartmentcorp.com" },
   { property: "Silver Springs",      manager: "Tarshia Pierce",         email: "silversprings@apartmentcorp.com",  ext: "245", region: "Region 1", regionalManager: "Leslie Rolon",      regionalEmail: "leslie@apartmentcorp.com" },
   { property: "Thomasville",         manager: "Ebony Nelson",           email: "thomasville@apartmentcorp.com",    ext: "295", region: "Region 1", regionalManager: "Leslie Rolon",      regionalEmail: "leslie@apartmentcorp.com" },
-  { property: "Breckenridge",        manager: "Susan Lopez",            email: "susan@apartmentcorp.com",          ext: "227", region: "Region 2", regionalManager: "Region 2 Manager",  regionalEmail: "" },
-  { property: "Crossroads",          manager: "Jennifer Parks",         email: "crossroads@apartmentcorp.com",     ext: "273", region: "Region 2", regionalManager: "Region 2 Manager",  regionalEmail: "" },
-  { property: "Cumberland",          manager: "Kiara Brown",            email: "cumberland@apartmentcorp.com",     ext: "219", region: "Region 2", regionalManager: "Region 2 Manager",  regionalEmail: "" },
-  { property: "Grace Townhomes",     manager: "Susan Lopez",            email: "susan@apartmentcorp.com",          ext: "227", region: "Region 2", regionalManager: "Region 2 Manager",  regionalEmail: "" },
-  { property: "Grove Park",          manager: "Nikki Moreno",           email: "grovepark@apartmentcorp.com",      ext: "265", region: "Region 2", regionalManager: "Region 2 Manager",  regionalEmail: "" },
-  { property: "Holiday",             manager: "Arlene Vinson",          email: "holiday@apartmentcorp.com",        ext: "235", region: "Region 2", regionalManager: "Region 2 Manager",  regionalEmail: "" },
-  { property: "La Promesa",          manager: "Ashley Clay",            email: "lapromesa@apartmentcorp.com",      ext: "269", region: "Region 2", regionalManager: "Region 2 Manager",  regionalEmail: "" },
-  { property: "Lexington",           manager: "(No manager listed)",    email: "lexingtonasst@apartmentcorp.com",  ext: "",    region: "Region 2", regionalManager: "Region 2 Manager",  regionalEmail: "" },
-  { property: "Walnut Hill",         manager: "Johann Armstead",        email: "walnut@apartmentcorp.com",         ext: "267", region: "Region 2", regionalManager: "Region 2 Manager",  regionalEmail: "" },
+  { property: "Breckenridge",        manager: "Susan Lopez",            email: "susan@apartmentcorp.com",          ext: "227", region: "Region 2", regionalManager: "Leslie Rolon",      regionalEmail: "leslie@apartmentcorp.com" },
+  { property: "Crossroads",          manager: "Jennifer Parks",         email: "crossroads@apartmentcorp.com",     ext: "273", region: "Region 2", regionalManager: "Leslie Rolon",      regionalEmail: "leslie@apartmentcorp.com" },
+  { property: "Cumberland",          manager: "Kiara Brown",            email: "cumberland@apartmentcorp.com",     ext: "219", region: "Region 2", regionalManager: "Leslie Rolon",      regionalEmail: "leslie@apartmentcorp.com" },
+  { property: "Grace Townhomes",     manager: "Susan Lopez",            email: "susan@apartmentcorp.com",          ext: "227", region: "Region 2", regionalManager: "Leslie Rolon",      regionalEmail: "leslie@apartmentcorp.com" },
+  { property: "Grove Park",          manager: "Nikki Moreno",           email: "grovepark@apartmentcorp.com",      ext: "265", region: "Region 2", regionalManager: "Leslie Rolon",      regionalEmail: "leslie@apartmentcorp.com" },
+  { property: "Holiday",             manager: "Arlene Vinson",          email: "holiday@apartmentcorp.com",        ext: "235", region: "Region 2", regionalManager: "Leslie Rolon",      regionalEmail: "leslie@apartmentcorp.com" },
+  { property: "La Promesa",          manager: "Ashley Clay",            email: "lapromesa@apartmentcorp.com",      ext: "269", region: "Region 2", regionalManager: "Leslie Rolon",      regionalEmail: "leslie@apartmentcorp.com" },
+  { property: "Lexington",           manager: "Susan Lopez",            email: "susan@apartmentcorp.com",          ext: "227", region: "Region 2", regionalManager: "Leslie Rolon",      regionalEmail: "leslie@apartmentcorp.com" },
+  { property: "Walnut Hill",         manager: "Johann Armstead",        email: "walnut@apartmentcorp.com",         ext: "267", region: "Region 2", regionalManager: "Leslie Rolon",      regionalEmail: "leslie@apartmentcorp.com" },
   { property: "Bayou Pointe",        manager: "Jennifer Frederick",     email: "bayou@apartmentcorp.com",          ext: "298", region: "Region 3", regionalManager: "Ginger Positerry",  regionalEmail: "ginger@apartmentcorp.com" },
   { property: "Gates of Manhattan",  manager: "Lindgret Celestine",     email: "lindgret@apartmentcorp.com",       ext: "284", region: "Region 3", regionalManager: "Ginger Positerry",  regionalEmail: "ginger@apartmentcorp.com" },
   { property: "Howell Place",        manager: "Sandra Crump",           email: "howell@apartmentcorp.com",         ext: "259", region: "Region 3", regionalManager: "Ginger Positerry",  regionalEmail: "ginger@apartmentcorp.com" },
@@ -149,6 +149,10 @@ function buildEmailDrafts(xedProperties: string[], monthLabel: string) {
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function Home() {
+  // The userAuth hooks provides authentication state
+  // To implement login/logout functionality, simply call logout() or redirect to getLoginUrl()
+  // auth available if needed
+
   const now = new Date();
   const [selectedYear, setSelectedYear]   = useState(now.getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth());
