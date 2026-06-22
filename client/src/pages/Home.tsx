@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, DragEvent } from "react";
-import { Printer, RotateCcw, Mail, X as XIcon, Copy, Check, FileText, Upload, Eye, Trash2, ChevronLeft, ChevronRight, ClipboardList } from "lucide-react";
+import { Printer, RotateCcw, Mail, X as XIcon, Copy, Check, FileText, Upload, Eye, Trash2, ChevronLeft, ChevronRight, ClipboardList, GitCompare } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -155,7 +155,21 @@ export default function Home() {
   const [allData, setAllData]             = useState<AllMonthsData>(loadAllData);
   const [showEmailModal, setShowEmailModal]     = useState(false);
   const [showSummaryModal, setShowSummaryModal] = useState(false);
+  const [showCompareModal, setShowCompareModal] = useState(false);
   const [copiedIdx, setCopiedIdx]         = useState<number | null>(null);
+
+  // Previous month data
+  const prevMk = (() => {
+    const pm = selectedMonth === 0 ? 11 : selectedMonth - 1;
+    const py = selectedMonth === 0 ? selectedYear - 1 : selectedYear;
+    return monthKey(py, pm);
+  })();
+  const prevMonthLabel = (() => {
+    const pm = selectedMonth === 0 ? 11 : selectedMonth - 1;
+    const py = selectedMonth === 0 ? selectedYear - 1 : selectedYear;
+    return `${MONTHS[pm]} ${py}`;
+  })();
+  const prevState: InspectionState = allData[prevMk] || {};
 
   const mk = monthKey(selectedYear, selectedMonth);
   const monthLabel = `${MONTHS[selectedMonth]} ${selectedYear}`;
@@ -247,6 +261,14 @@ export default function Home() {
               </p>
             </div>
             <div className="flex gap-2 flex-wrap print:hidden items-center">
+              {/* Compare button */}
+              <button
+                onClick={() => setShowCompareModal(true)}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-md bg-white/10 hover:bg-white/20 text-white text-sm font-medium transition-all active:scale-95"
+              >
+                <GitCompare className="w-4 h-4" />
+                Compare
+              </button>
               {/* Summary button */}
               <button
                 onClick={() => setShowSummaryModal(true)}
@@ -380,6 +402,17 @@ export default function Home() {
           ))}
         </div>
       </main>
+
+      {/* ── Compare Modal ── */}
+      {showCompareModal && (
+        <CompareModal
+          currentState={state}
+          prevState={prevState}
+          currentLabel={monthLabel}
+          prevLabel={prevMonthLabel}
+          onClose={() => setShowCompareModal(false)}
+        />
+      )}
 
       {/* ── Summary Modal ── */}
       {showSummaryModal && (
@@ -777,6 +810,171 @@ function EmailModal({ drafts, onClose, copiedIdx, onCopy, onOpen }: {
               </div>
             </div>
           )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Compare Modal ────────────────────────────────────────────────────────────
+
+function CompareModal({ currentState, prevState, currentLabel, prevLabel, onClose }: {
+  currentState: InspectionState;
+  prevState: InspectionState;
+  currentLabel: string;
+  prevLabel: string;
+  onClose: () => void;
+}) {
+  const hasPrevData = Object.keys(prevState).length > 0;
+
+  // Build per-property comparison rows
+  const rows = REGIONS.flatMap((r) =>
+    r.properties.map((prop) => {
+      const key = buildKey(r.name, prop);
+      const cur = currentState[key] || { checked: false, xed: false };
+      const prv = prevState[key]   || { checked: false, xed: false };
+
+      const curStatus = cur.checked && !cur.xed ? "pass"
+        : cur.xed && !cur.checked ? "fail"
+        : cur.checked && cur.xed ? "both"
+        : "none";
+      const prvStatus = prv.checked && !prv.xed ? "pass"
+        : prv.xed && !prv.checked ? "fail"
+        : prv.checked && prv.xed ? "both"
+        : "none";
+
+      // Change direction
+      const change: "improved" | "regressed" | "same" | "new-pass" | "new-fail" | "unchanged" =
+        prvStatus === "none" && curStatus === "pass" ? "new-pass"
+        : prvStatus === "none" && curStatus === "fail" ? "new-fail"
+        : prvStatus === "fail" && curStatus === "pass" ? "improved"
+        : prvStatus === "pass" && curStatus === "fail" ? "regressed"
+        : curStatus === prvStatus ? "same"
+        : "unchanged";
+
+      return { prop, region: r.name, curStatus, prvStatus, change, curNote: cur.note, prvNote: prv.note };
+    })
+  );
+
+  const improved  = rows.filter((r) => r.change === "improved" || r.change === "new-pass");
+  const regressed = rows.filter((r) => r.change === "regressed" || r.change === "new-fail");
+  const same      = rows.filter((r) => r.change === "same" && r.curStatus !== "none");
+  const unreviewed = rows.filter((r) => r.curStatus === "none" && r.prvStatus === "none");
+
+  const statusBadge = (s: string) => {
+    if (s === "pass") return <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">✓ Pass</span>;
+    if (s === "fail") return <span className="inline-flex items-center gap-1 text-xs font-semibold text-red-700 bg-red-100 px-2 py-0.5 rounded-full">✗ Fail</span>;
+    if (s === "both") return <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">⚠ Both</span>;
+    return <span className="text-xs text-gray-400">—</span>;
+  };
+
+  const Section = ({ title, items, color }: { title: string; items: typeof rows; color: string }) => (
+    items.length === 0 ? null : (
+      <div className="mb-5">
+        <div className={`text-xs font-bold uppercase tracking-widest px-3 py-1.5 rounded mb-2 ${color}`}>{title} ({items.length})</div>
+        <div className="space-y-1">
+          {items.map(({ prop, region, curStatus, prvStatus, curNote, prvNote }) => (
+            <div key={prop} className="flex items-start justify-between bg-white border border-gray-100 rounded px-3 py-2 gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm font-semibold text-gray-800">{prop}</span>
+                  <span className="text-xs text-gray-400">{region}</span>
+                </div>
+                {(prvNote || curNote) && (
+                  <div className="mt-1 flex flex-col gap-0.5">
+                    {prvNote && <div className="text-xs text-gray-500">📝 <span className="font-medium">{prevLabel}:</span> {prvNote}</div>}
+                    {curNote && <div className="text-xs text-blue-600">📝 <span className="font-medium">{currentLabel}:</span> {curNote}</div>}
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {statusBadge(prvStatus)}
+                <span className="text-gray-300 text-xs">→</span>
+                {statusBadge(curStatus)}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  );
+
+  // Summary stats
+  const curPassed = rows.filter((r) => r.curStatus === "pass").length;
+  const curFailed = rows.filter((r) => r.curStatus === "fail").length;
+  const prvPassed = rows.filter((r) => r.prvStatus === "pass").length;
+  const prvFailed = rows.filter((r) => r.prvStatus === "fail").length;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.55)" }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="bg-white rounded-xl shadow-2xl w-full flex flex-col"
+        style={{ animation: "modalIn 0.2s cubic-bezier(0.23,1,0.32,1)", maxWidth: "min(900px, calc(100vw - 2rem))", maxHeight: "calc(100vh - 2rem)", height: "calc(100vh - 4rem)" }}>
+
+        {/* Header */}
+        <div className="bg-[#1e2d4a] px-6 py-4 flex items-center justify-between flex-shrink-0 rounded-t-xl">
+          <div>
+            <h2 className="text-white font-bold text-lg" style={{ fontFamily: "Georgia, serif" }}>Month Comparison</h2>
+            <p className="text-[#93b4d8] text-xs mt-0.5">{prevLabel} → {currentLabel}</p>
+          </div>
+          <button onClick={onClose} className="text-white/60 hover:text-white transition-colors p-1 rounded">
+            <XIcon className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Stats bar */}
+        <div className="grid grid-cols-4 divide-x divide-gray-200 border-b border-gray-200 flex-shrink-0">
+          <div className="px-4 py-3 text-center">
+            <div className="text-xs text-gray-400 mb-1 font-semibold uppercase tracking-wide">Passed</div>
+            <div className="flex items-center justify-center gap-2">
+              <span className="text-lg font-bold text-gray-400">{prvPassed}</span>
+              <span className="text-gray-300">→</span>
+              <span className={`text-lg font-bold ${curPassed >= prvPassed ? "text-green-600" : "text-red-500"}`}>{curPassed}</span>
+            </div>
+          </div>
+          <div className="px-4 py-3 text-center">
+            <div className="text-xs text-gray-400 mb-1 font-semibold uppercase tracking-wide">Failed</div>
+            <div className="flex items-center justify-center gap-2">
+              <span className="text-lg font-bold text-gray-400">{prvFailed}</span>
+              <span className="text-gray-300">→</span>
+              <span className={`text-lg font-bold ${curFailed <= prvFailed ? "text-green-600" : "text-red-500"}`}>{curFailed}</span>
+            </div>
+          </div>
+          <div className="px-4 py-3 text-center">
+            <div className="text-xs text-gray-400 mb-1 font-semibold uppercase tracking-wide">Improved</div>
+            <div className="text-lg font-bold text-green-600">{improved.length}</div>
+          </div>
+          <div className="px-4 py-3 text-center">
+            <div className="text-xs text-gray-400 mb-1 font-semibold uppercase tracking-wide">Regressed</div>
+            <div className="text-lg font-bold text-red-500">{regressed.length}</div>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="overflow-y-auto px-6 py-4" style={{ flex: "1 1 0", minHeight: 0 }}>
+          {!hasPrevData ? (
+            <div className="text-center py-12">
+              <div className="text-4xl mb-3">📅</div>
+              <p className="text-gray-600 font-medium">No data for {prevLabel}</p>
+              <p className="text-gray-400 text-sm mt-1">Complete {prevLabel}'s checklist to enable comparison.</p>
+            </div>
+          ) : (
+            <>
+              <Section title="🔴 Regressed (was passing, now failing)" items={regressed} color="text-red-700 bg-red-50" />
+              <Section title="🟢 Improved (was failing, now passing)" items={improved} color="text-green-700 bg-green-50" />
+              <Section title="✅ Consistent Pass" items={same.filter((r) => r.curStatus === "pass")} color="text-green-600 bg-green-50/60" />
+              <Section title="❌ Persistent Fail" items={same.filter((r) => r.curStatus === "fail")} color="text-red-600 bg-red-50/60" />
+              {unreviewed.length > 0 && (
+                <div className="mt-4 text-xs text-gray-400 text-center">{unreviewed.length} properties not yet reviewed in either month</div>
+              )}
+            </>
+          )}
+        </div>
+
+        <div className="px-6 py-3 border-t border-gray-200 bg-gray-50 flex justify-end flex-shrink-0 rounded-b-xl">
+          <button onClick={onClose} className="px-4 py-2 bg-[#1e2d4a] hover:bg-[#2a3f6b] text-white text-sm font-medium rounded-md transition-all active:scale-95">
+            Close
+          </button>
         </div>
       </div>
     </div>
