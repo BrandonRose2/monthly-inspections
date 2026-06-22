@@ -870,6 +870,60 @@ function CompareModal({ currentState, prevState, currentLabel, prevLabel, onClos
 }) {
   const hasPrevData = Object.keys(prevState).length > 0;
 
+  const printCompare = () => {
+    const statusLabel = (s: string) =>
+      s === "pass" ? '<span style="color:#16a34a;font-weight:bold">✓ Pass</span>'
+      : s === "fail" ? '<span style="color:#dc2626;font-weight:bold">✗ Fail</span>'
+      : s === "both" ? '<span style="color:#d97706;font-weight:bold">⚠ Both</span>'
+      : '<span style="color:#9ca3af">—</span>';
+
+    const sectionHtml = (title: string, items: typeof rows, bg: string) =>
+      items.length === 0 ? '' :
+      `<div style="margin-bottom:8px">
+        <div style="background:${bg};padding:3px 8px;font-size:7pt;font-weight:bold;letter-spacing:1px;text-transform:uppercase;border-radius:3px;margin-bottom:3px">${title} (${items.length})</div>
+        <table style="width:100%;border-collapse:collapse">
+          <tr style="background:#f9fafb">
+            <th style="padding:2px 6px;font-size:7pt;text-align:left;border-bottom:1px solid #e5e7eb">Property</th>
+            <th style="padding:2px 6px;font-size:7pt;text-align:left;border-bottom:1px solid #e5e7eb">Region</th>
+            <th style="padding:2px 6px;font-size:7pt;text-align:center;border-bottom:1px solid #e5e7eb">${prevLabel}</th>
+            <th style="padding:2px 6px;font-size:7pt;text-align:center;border-bottom:1px solid #e5e7eb">${currentLabel}</th>
+          </tr>
+          ${items.map(({ prop, region, curStatus, prvStatus, curNote, prvNote }) =>
+            `<tr style="border-bottom:1px solid #f3f4f6">
+              <td style="padding:2px 6px;font-size:7.5pt;font-weight:600">${prop}${curNote ? `<br><span style="font-size:6.5pt;color:#6b7280;font-weight:normal">📝 ${curNote}</span>` : ''}</td>
+              <td style="padding:2px 6px;font-size:7pt;color:#6b7280">${region}</td>
+              <td style="padding:2px 6px;font-size:7pt;text-align:center">${statusLabel(prvStatus)}</td>
+              <td style="padding:2px 6px;font-size:7pt;text-align:center">${statusLabel(curStatus)}</td>
+            </tr>`
+          ).join('')}
+        </table>
+      </div>`;
+
+    const win = window.open('', '_blank');
+    if (!win) return;
+    win.document.write(`<!DOCTYPE html><html><head><title>Comparison — ${prevLabel} vs ${currentLabel}</title>
+      <style>@page{size:letter portrait;margin:0.4in 0.5in} body{font-family:Arial,sans-serif;font-size:9pt} h1{font-size:13pt;margin:0} p{margin:2px 0;font-size:8pt;color:#93b4d8}</style>
+    </head><body>
+      <div style="background:#1e2d4a;color:white;padding:8px 12px;border-radius:4px;margin-bottom:10px">
+        <h1>Month Comparison</h1>
+        <p>${prevLabel} → ${currentLabel}</p>
+      </div>
+      <div style="display:flex;gap:12px;margin-bottom:10px;border:1px solid #e5e7eb;border-radius:4px;overflow:hidden">
+        <div style="flex:1;text-align:center;padding:5px"><div style="font-size:7pt;color:#6b7280;font-weight:bold;text-transform:uppercase">Passed</div><div style="font-size:14pt;font-weight:bold;color:#6b7280">${prvPassed} → <span style="color:${curPassed >= prvPassed ? '#16a34a' : '#dc2626'}">${curPassed}</span></div></div>
+        <div style="flex:1;text-align:center;padding:5px;border-left:1px solid #e5e7eb"><div style="font-size:7pt;color:#6b7280;font-weight:bold;text-transform:uppercase">Failed</div><div style="font-size:14pt;font-weight:bold;color:#6b7280">${prvFailed} → <span style="color:${curFailed <= prvFailed ? '#16a34a' : '#dc2626'}">${curFailed}</span></div></div>
+        <div style="flex:1;text-align:center;padding:5px;border-left:1px solid #e5e7eb"><div style="font-size:7pt;color:#6b7280;font-weight:bold;text-transform:uppercase">Improved</div><div style="font-size:14pt;font-weight:bold;color:#16a34a">${improved.length}</div></div>
+        <div style="flex:1;text-align:center;padding:5px;border-left:1px solid #e5e7eb"><div style="font-size:7pt;color:#6b7280;font-weight:bold;text-transform:uppercase">Regressed</div><div style="font-size:14pt;font-weight:bold;color:#dc2626">${regressed.length}</div></div>
+      </div>
+      ${sectionHtml('🔴 Regressed (was passing, now failing)', regressed, '#fef2f2')}
+      ${sectionHtml('🟢 Improved (was failing, now passing)', improved, '#f0fdf4')}
+      ${sectionHtml('✅ Consistent Pass', same.filter(r => r.curStatus === 'pass'), '#f0fdf4')}
+      ${sectionHtml('❌ Persistent Fail', same.filter(r => r.curStatus === 'fail'), '#fef2f2')}
+      <div style="margin-top:10px;font-size:7pt;color:#9ca3af;border-top:1px solid #e5e7eb;padding-top:5px">Printed: ${new Date().toLocaleString()} | ApartmentCorp Monthly Inspections</div>
+    </body></html>`);
+    win.document.close();
+    setTimeout(() => { win.print(); }, 300);
+  };
+
   // Build per-property comparison rows
   const rows = REGIONS.flatMap((r) =>
     r.properties.map((prop) => {
@@ -960,9 +1014,14 @@ function CompareModal({ currentState, prevState, currentLabel, prevLabel, onClos
             <h2 className="text-white font-bold text-lg" style={{ fontFamily: "Georgia, serif" }}>Month Comparison</h2>
             <p className="text-[#93b4d8] text-xs mt-0.5">{prevLabel} → {currentLabel}</p>
           </div>
-          <button onClick={onClose} className="text-white/60 hover:text-white transition-colors p-1 rounded">
-            <XIcon className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={printCompare} className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-white/10 hover:bg-white/20 text-white text-xs font-medium transition-all active:scale-95">
+              <Printer className="w-3.5 h-3.5" /> Print
+            </button>
+            <button onClick={onClose} className="text-white/60 hover:text-white transition-colors p-1 rounded">
+              <XIcon className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Stats bar */}
