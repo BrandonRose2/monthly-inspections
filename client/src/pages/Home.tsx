@@ -396,14 +396,27 @@ export default function Home() {
 
       <style>{`
         @media print {
-          @page { size: letter; margin: 0.4in 0.5in; }
+          @page { size: letter landscape; margin: 0.3in 0.35in; }
+          * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
           .print\\:hidden { display: none !important; }
-          body { background: white !important; }
-          header { background: #1e2d4a !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-          .region-header { background: #1e2d4a !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-          .status-box.is-checked { border-color: #16a34a !important; background: #f0fdf4 !important; color: #16a34a !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-          .status-box.is-xed { border-color: #dc2626 !important; background: #fef2f2 !important; color: #dc2626 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          body { background: white !important; font-size: 7.5pt !important; }
+          header { background: #1e2d4a !important; padding: 6px 12px !important; }
+          header h1 { font-size: 14pt !important; }
+          header p { font-size: 7pt !important; margin: 0 !important; }
+          .region-header { background: #1e2d4a !important; padding: 3px 8px !important; }
+          .region-header span { font-size: 7pt !important; }
           .pdf-drop-zone { display: none !important; }
+          main { padding: 4px 8px 4px !important; }
+          main > div { gap: 6px !important; }
+          .bg-white.rounded-lg { border-radius: 3px !important; box-shadow: none !important; }
+          li { padding: 1px 6px !important; min-height: 0 !important; }
+          li span.text-sm { font-size: 7pt !important; }
+          .status-box { width: 14px !important; height: 14px !important; font-size: 8pt !important; border-width: 1px !important; }
+          .status-box.is-checked { border-color: #16a34a !important; background: #f0fdf4 !important; color: #16a34a !important; }
+          .status-box.is-xed { border-color: #dc2626 !important; background: #fef2f2 !important; color: #dc2626 !important; }
+          .flex.items-center.px-3.py-1\\.5 { padding: 2px 6px !important; font-size: 6pt !important; }
+          .w-8 { width: 18px !important; }
+          div[class*="legend"], div[class*="pt-3"] { display: none !important; }
         }
         @keyframes modalIn {
           from { opacity: 0; transform: scale(0.96) translateY(10px); }
