@@ -24,6 +24,7 @@ interface PropertyStatus {
   checked: boolean;
   xed: boolean;
   pdf?: PDFAttachment | null;
+  note?: string;
 }
 
 type InspectionState = Record<string, PropertyStatus>;
@@ -178,6 +179,13 @@ export default function Home() {
     setState((prev) => {
       const cur = prev[key] || { checked: false, xed: false };
       return { ...prev, [key]: { ...cur, pdf } };
+    });
+  }, [setState]);
+
+  const addNote = useCallback((key: string, note: string) => {
+    setState((prev) => {
+      const cur = prev[key] || { checked: false, xed: false };
+      return { ...prev, [key]: { ...cur, note } };
     });
   }, [setState]);
 
@@ -368,7 +376,7 @@ export default function Home() {
       <main className="max-w-6xl mx-auto px-6 py-4 pb-12">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           {REGIONS.map((region) => (
-            <RegionBlock key={region.name} region={region} state={state} onToggle={toggleStatus} onAttachPDF={attachPDF} />
+            <RegionBlock key={region.name} region={region} state={state} onToggle={toggleStatus} onAttachPDF={attachPDF} onNote={addNote} />
           ))}
         </div>
       </main>
@@ -435,11 +443,12 @@ export default function Home() {
 
 // ─── Region Block ─────────────────────────────────────────────────────────────
 
-function RegionBlock({ region, state, onToggle, onAttachPDF }: {
+function RegionBlock({ region, state, onToggle, onAttachPDF, onNote }: {
   region: { name: string; properties: string[] };
   state: InspectionState;
   onToggle: (key: string, type: "checked" | "xed") => void;
   onAttachPDF: (key: string, pdf: PDFAttachment | null) => void;
+  onNote: (key: string, note: string) => void;
 }) {
   return (
     <div className="bg-white rounded-lg shadow-sm overflow-hidden border border-gray-200">
@@ -462,22 +471,38 @@ function RegionBlock({ region, state, onToggle, onAttachPDF }: {
             : status.xed ? "bg-red-50/25"
             : idx % 2 === 0 ? "bg-white" : "bg-gray-50/40";
           return (
-            <li key={prop} className={`flex items-center px-3 py-2 border-b border-gray-100 last:border-0 transition-colors ${rowBg}`}>
-              <button onClick={() => onToggle(key, "checked")} title="Mark as completed"
-                className={`status-box w-8 h-8 flex-shrink-0 rounded border-2 flex items-center justify-center font-bold text-sm transition-all duration-150 active:scale-90 select-none ${
-                  status.checked ? "is-checked border-green-500 bg-green-50 text-green-600 shadow-sm"
-                  : "border-gray-300 bg-white text-transparent hover:border-green-400 hover:bg-green-50/60"}`}>✓</button>
-              <button onClick={() => onToggle(key, "xed")} title="Mark as not done / issue"
-                className={`status-box w-8 h-8 flex-shrink-0 rounded border-2 flex items-center justify-center font-bold text-sm transition-all duration-150 active:scale-90 select-none ml-1 ${
-                  status.xed ? "is-xed border-red-500 bg-red-50 text-red-600 shadow-sm"
-                  : "border-gray-300 bg-white text-transparent hover:border-red-400 hover:bg-red-50/60"}`}>✗</button>
-              <span className={`flex-1 text-sm font-medium pl-2 truncate ${
-                status.checked && !status.xed ? "text-green-800"
-                : status.xed && !status.checked ? "text-red-800"
-                : status.checked && status.xed ? "text-amber-800"
-                : "text-gray-800"}`}>{prop}</span>
-              <div className="w-28 flex-shrink-0 print:hidden">
-                <PDFDropZone pdf={status.pdf ?? null} onAttach={(pdf) => onAttachPDF(key, pdf)} onRemove={() => onAttachPDF(key, null)} />
+            <li key={prop} className={`flex flex-col border-b border-gray-100 last:border-0 transition-colors ${rowBg}`}>
+              <div className="flex items-center px-3 py-2">
+                <button onClick={() => onToggle(key, "checked")} title="Mark as completed"
+                  className={`status-box w-8 h-8 flex-shrink-0 rounded border-2 flex items-center justify-center font-bold text-sm transition-all duration-150 active:scale-90 select-none ${
+                    status.checked ? "is-checked border-green-500 bg-green-50 text-green-600 shadow-sm"
+                    : "border-gray-300 bg-white text-transparent hover:border-green-400 hover:bg-green-50/60"}`}>✓</button>
+                <button onClick={() => onToggle(key, "xed")} title="Mark as not done / issue"
+                  className={`status-box w-8 h-8 flex-shrink-0 rounded border-2 flex items-center justify-center font-bold text-sm transition-all duration-150 active:scale-90 select-none ml-1 ${
+                    status.xed ? "is-xed border-red-500 bg-red-50 text-red-600 shadow-sm"
+                    : "border-gray-300 bg-white text-transparent hover:border-red-400 hover:bg-red-50/60"}`}>✗</button>
+                <span className={`flex-1 text-sm font-medium pl-2 ${
+                  status.checked && !status.xed ? "text-green-800"
+                  : status.xed && !status.checked ? "text-red-800"
+                  : status.checked && status.xed ? "text-amber-800"
+                  : "text-gray-800"}`}>{prop}</span>
+                <div className="w-28 flex-shrink-0 print:hidden">
+                  <PDFDropZone pdf={status.pdf ?? null} onAttach={(pdf) => onAttachPDF(key, pdf)} onRemove={() => onAttachPDF(key, null)} />
+                </div>
+              </div>
+              {/* Notes row */}
+              <div className="px-3 pb-2 print:pb-1">
+                <input
+                  type="text"
+                  value={status.note || ""}
+                  onChange={(e) => onNote(key, e.target.value)}
+                  placeholder="Add a note..."
+                  className={`w-full text-xs rounded border px-2 py-1 outline-none transition-colors print:border-0 print:bg-transparent print:text-gray-600 ${
+                    status.note
+                      ? status.xed ? "border-red-200 bg-red-50/60 text-red-800 placeholder-red-300" : "border-gray-200 bg-white text-gray-700 placeholder-gray-300"
+                      : "border-transparent bg-transparent text-gray-500 placeholder-gray-300 hover:border-gray-200 hover:bg-gray-50 focus:border-blue-300 focus:bg-white"
+                  }`}
+                />
               </div>
             </li>
           );
@@ -654,13 +679,22 @@ function SummaryModal({ xedProperties, checkedCount, monthLabel, state, onClose 
                   <ul className="space-y-1">
                     {r.xed.map((prop) => {
                       const c = contactMap[prop];
+                      const regionObj = REGIONS.find((rg) => rg.properties.includes(prop));
+                      const note = regionObj ? state[buildKey(regionObj.name, prop)]?.note : undefined;
                       return (
-                        <li key={prop} className="flex items-center justify-between px-3 py-2 bg-red-50 border border-red-100 rounded">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-sm font-semibold text-red-800">{prop}</span>
-                            {c && <span className="text-xs text-red-500">— {c.manager}{c.ext ? <span className="ml-1 text-red-400">Ext. {c.ext}</span> : ""}</span>}
+                        <li key={prop} className="px-3 py-2 bg-red-50 border border-red-100 rounded">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-sm font-semibold text-red-800">{prop}</span>
+                              {c && <span className="text-xs text-red-500">— {c.manager}{c.ext ? <span className="ml-1 text-red-400">Ext. {c.ext}</span> : ""}</span>}
+                            </div>
+                            <span className="text-red-500 font-bold text-sm flex-shrink-0 ml-2">✗</span>
                           </div>
-                          <span className="text-red-500 font-bold text-sm flex-shrink-0 ml-2">✗</span>
+                          {note && (
+                            <div className="mt-1 text-xs text-red-700 bg-red-100 rounded px-2 py-1 border border-red-200">
+                              📝 {note}
+                            </div>
+                          )}
                         </li>
                       );
                     })}
