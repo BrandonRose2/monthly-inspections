@@ -7,6 +7,7 @@ interface PropertyContact {
   property: string;
   manager: string;
   email: string;
+  ext: string;
   region: string;
   regionalManager: string;
   regionalEmail: string;
@@ -33,47 +34,47 @@ type AllMonthsData = Record<string, InspectionState>;
 // ─── Contact Data ─────────────────────────────────────────────────────────────
 
 const CONTACTS: PropertyContact[] = [
-  { property: "Arbor Crest",         manager: "Erica Finch",           email: "arborcrest@apartmentcorp.com",     region: "Region 1", regionalManager: "JR Rolon",          regionalEmail: "jrrolon@apartmentcorp.com" },
-  { property: "Boca Ciega",          manager: "Katrina Weekly",         email: "katrina@apartmentcorp.com",        region: "Region 1", regionalManager: "JR Rolon",          regionalEmail: "jrrolon@apartmentcorp.com" },
-  { property: "Coral Village",       manager: "Keyla Maranon",          email: "coralvillage@apartmentcorp.com",   region: "Region 1", regionalManager: "JR Rolon",          regionalEmail: "jrrolon@apartmentcorp.com" },
-  { property: "Jefferson",           manager: "Brandy Amador",          email: "jefferson@apartmentcorp.com",      region: "Region 1", regionalManager: "JR Rolon",          regionalEmail: "jrrolon@apartmentcorp.com" },
-  { property: "Macedonia",           manager: "Erika Scales",           email: "macedonia@apartmentcorp.com",      region: "Region 1", regionalManager: "JR Rolon",          regionalEmail: "jrrolon@apartmentcorp.com" },
-  { property: "Opa Locka",           manager: "Rosa Villarroel",        email: "opa@apartmentcorp.com",            region: "Region 1", regionalManager: "JR Rolon",          regionalEmail: "jrrolon@apartmentcorp.com" },
-  { property: "River Pointe",        manager: "Stephanie Delong",       email: "stephanie@apartmentcorp.com",      region: "Region 1", regionalManager: "JR Rolon",          regionalEmail: "jrrolon@apartmentcorp.com" },
-  { property: "Silver Springs",      manager: "Tarshia Pierce",         email: "silversprings@apartmentcorp.com",  region: "Region 1", regionalManager: "Leslie Rolon",      regionalEmail: "leslie@apartmentcorp.com" },
-  { property: "Thomasville",         manager: "Ebony Nelson",           email: "thomasville@apartmentcorp.com",    region: "Region 1", regionalManager: "Leslie Rolon",      regionalEmail: "leslie@apartmentcorp.com" },
-  { property: "Breckenridge",        manager: "(No manager listed)",    email: "lexingtonasst@apartmentcorp.com",  region: "Region 2", regionalManager: "Region 2 Manager",  regionalEmail: "" },
-  { property: "Crossroads",          manager: "Jennifer Parks",         email: "crossroads@apartmentcorp.com",     region: "Region 2", regionalManager: "Region 2 Manager",  regionalEmail: "" },
-  { property: "Cumberland",          manager: "Kiara Brown",            email: "cumberland@apartmentcorp.com",     region: "Region 2", regionalManager: "Region 2 Manager",  regionalEmail: "" },
-  { property: "Grace Townhomes",     manager: "Susan Lopez",            email: "susan@apartmentcorp.com",          region: "Region 2", regionalManager: "Region 2 Manager",  regionalEmail: "" },
-  { property: "Grove Park",          manager: "Nikki Moreno",           email: "grovepark@apartmentcorp.com",      region: "Region 2", regionalManager: "Region 2 Manager",  regionalEmail: "" },
-  { property: "Holiday",             manager: "Arlene Vinson",          email: "holiday@apartmentcorp.com",        region: "Region 2", regionalManager: "Region 2 Manager",  regionalEmail: "" },
-  { property: "La Promesa",          manager: "Ashley Clay",            email: "lapromesa@apartmentcorp.com",      region: "Region 2", regionalManager: "Region 2 Manager",  regionalEmail: "" },
-  { property: "Lexington",           manager: "(No manager listed)",    email: "lexingtonasst@apartmentcorp.com",  region: "Region 2", regionalManager: "Region 2 Manager",  regionalEmail: "" },
-  { property: "Walnut Hill",         manager: "Johann Armstead",        email: "walnut@apartmentcorp.com",         region: "Region 2", regionalManager: "Region 2 Manager",  regionalEmail: "" },
-  { property: "Bayou Pointe",        manager: "Jennifer Frederick",     email: "bayou@apartmentcorp.com",          region: "Region 3", regionalManager: "Ginger Positerry",  regionalEmail: "ginger@apartmentcorp.com" },
-  { property: "Gates of Manhattan",  manager: "Lindgret Celestine",     email: "lindgret@apartmentcorp.com",       region: "Region 3", regionalManager: "Ginger Positerry",  regionalEmail: "ginger@apartmentcorp.com" },
-  { property: "Howell Place",        manager: "Sandra Crump",           email: "howell@apartmentcorp.com",         region: "Region 3", regionalManager: "Ginger Positerry",  regionalEmail: "ginger@apartmentcorp.com" },
-  { property: "Marrero",             manager: "Ketorah Parks",          email: "rubystarmanager@apartmentcorp.com",region: "Region 3", regionalManager: "Ginger Positerry",  regionalEmail: "ginger@apartmentcorp.com" },
-  { property: "North Pointe",        manager: "Jennifer Frederick",     email: "northpointe@apartmentcorp.com",    region: "Region 3", regionalManager: "Ginger Positerry",  regionalEmail: "ginger@apartmentcorp.com" },
-  { property: "Pelican Bay",         manager: "Dequanta Sutherland",    email: "pelican@apartmentcorp.com",        region: "Region 3", regionalManager: "Ginger Positerry",  regionalEmail: "ginger@apartmentcorp.com" },
-  { property: "Pirates Bend",        manager: "Sandra Crump",           email: "pirates@apartmentcorp.com",        region: "Region 3", regionalManager: "Ginger Positerry",  regionalEmail: "ginger@apartmentcorp.com" },
-  { property: "Ruby Diamond",        manager: "Ketorah Parks",          email: "rubystarmanager@apartmentcorp.com",region: "Region 3", regionalManager: "Ginger Positerry",  regionalEmail: "ginger@apartmentcorp.com" },
-  { property: "St. Charles",         manager: "Deon Tolliver",          email: "stcharles@apartmentcorp.com",      region: "Region 3", regionalManager: "Ginger Positerry",  regionalEmail: "ginger@apartmentcorp.com" },
-  { property: "Star",                manager: "Ketorah Parks",          email: "rubystarmanager@apartmentcorp.com",region: "Region 3", regionalManager: "Ginger Positerry",  regionalEmail: "ginger@apartmentcorp.com" },
-  { property: "Thibodaux",           manager: "Susie Rogers",           email: "colonialleasing@apartmentcorp.com",region: "Region 3", regionalManager: "Ginger Positerry",  regionalEmail: "ginger@apartmentcorp.com" },
-  { property: "Windsor / Yorkshire", manager: "Kimberly Powell",        email: "windsor@apartmentcorp.com",        region: "Region 3", regionalManager: "Ginger Positerry",  regionalEmail: "ginger@apartmentcorp.com" },
-  { property: "Anaheim Gardens",     manager: "Priscilla Walters",      email: "priscilla@apartmentcorp.com",      region: "Region 4", regionalManager: "Blake Weddington",  regionalEmail: "blake@apartmentcorp.com" },
-  { property: "Columbia",            manager: "Tammy Davis",            email: "tammy@apartmentcorp.com",          region: "Region 4", regionalManager: "Blake Weddington",  regionalEmail: "blake@apartmentcorp.com" },
-  { property: "Fairfax",             manager: "Shraga Kurs",            email: "alberto@apartmentcorp.com",        region: "Region 4", regionalManager: "Blake Weddington",  regionalEmail: "blake@apartmentcorp.com" },
-  { property: "Forest View",         manager: "Tammy / Heather",        email: "tammy@apartmentcorp.com",          region: "Region 4", regionalManager: "Blake Weddington",  regionalEmail: "blake@apartmentcorp.com" },
-  { property: "Granite Ridge",       manager: "James Abeyta",           email: "james@apartmentcorp.com",          region: "Region 4", regionalManager: "Blake Weddington",  regionalEmail: "blake@apartmentcorp.com" },
-  { property: "Midtown",             manager: "Steve Rand",             email: "alberto@apartmentcorp.com",        region: "Region 4", regionalManager: "Blake Weddington",  regionalEmail: "blake@apartmentcorp.com" },
-  { property: "Oak Hills",           manager: "Heather Hein",           email: "heatherh@apartmentcorp.com",       region: "Region 4", regionalManager: "Blake Weddington",  regionalEmail: "blake@apartmentcorp.com" },
-  { property: "Pacific",             manager: "Hailey Huber",           email: "pacificpointe@apartmentcorp.com",  region: "Region 4", regionalManager: "Blake Weddington",  regionalEmail: "blake@apartmentcorp.com" },
-  { property: "River Garden",        manager: "Heather Snyder",         email: "rivergarden@apartmentcorp.com",    region: "Region 4", regionalManager: "Blake Weddington",  regionalEmail: "blake@apartmentcorp.com" },
-  { property: "Urban",               manager: "Amunique Cannon",        email: "alberto@apartmentcorp.com",        region: "Region 4", regionalManager: "Blake Weddington",  regionalEmail: "blake@apartmentcorp.com" },
-  { property: "Wilmington",          manager: "Alberto Spence",         email: "alberto@apartmentcorp.com",        region: "Region 4", regionalManager: "Blake Weddington",  regionalEmail: "blake@apartmentcorp.com" },
+  { property: "Arbor Crest",         manager: "Erica Finch",           email: "arborcrest@apartmentcorp.com",     ext: "261", region: "Region 1", regionalManager: "JR Rolon",          regionalEmail: "jrrolon@apartmentcorp.com" },
+  { property: "Boca Ciega",          manager: "Katrina Weekly",         email: "katrina@apartmentcorp.com",        ext: "216", region: "Region 1", regionalManager: "JR Rolon",          regionalEmail: "jrrolon@apartmentcorp.com" },
+  { property: "Coral Village",       manager: "Keyla Maranon",          email: "coralvillage@apartmentcorp.com",   ext: "251", region: "Region 1", regionalManager: "JR Rolon",          regionalEmail: "jrrolon@apartmentcorp.com" },
+  { property: "Jefferson",           manager: "Brandy Amador",          email: "jefferson@apartmentcorp.com",      ext: "236", region: "Region 1", regionalManager: "JR Rolon",          regionalEmail: "jrrolon@apartmentcorp.com" },
+  { property: "Macedonia",           manager: "Erika Scales",           email: "macedonia@apartmentcorp.com",      ext: "222", region: "Region 1", regionalManager: "JR Rolon",          regionalEmail: "jrrolon@apartmentcorp.com" },
+  { property: "Opa Locka",           manager: "Rosa Villarroel",        email: "opa@apartmentcorp.com",            ext: "221", region: "Region 1", regionalManager: "JR Rolon",          regionalEmail: "jrrolon@apartmentcorp.com" },
+  { property: "River Pointe",        manager: "Stephanie Delong",       email: "stephanie@apartmentcorp.com",      ext: "224", region: "Region 1", regionalManager: "JR Rolon",          regionalEmail: "jrrolon@apartmentcorp.com" },
+  { property: "Silver Springs",      manager: "Tarshia Pierce",         email: "silversprings@apartmentcorp.com",  ext: "245", region: "Region 1", regionalManager: "Leslie Rolon",      regionalEmail: "leslie@apartmentcorp.com" },
+  { property: "Thomasville",         manager: "Ebony Nelson",           email: "thomasville@apartmentcorp.com",    ext: "295", region: "Region 1", regionalManager: "Leslie Rolon",      regionalEmail: "leslie@apartmentcorp.com" },
+  { property: "Breckenridge",        manager: "(No manager listed)",    email: "lexingtonasst@apartmentcorp.com",  ext: "",    region: "Region 2", regionalManager: "Region 2 Manager",  regionalEmail: "" },
+  { property: "Crossroads",          manager: "Jennifer Parks",         email: "crossroads@apartmentcorp.com",     ext: "273", region: "Region 2", regionalManager: "Region 2 Manager",  regionalEmail: "" },
+  { property: "Cumberland",          manager: "Kiara Brown",            email: "cumberland@apartmentcorp.com",     ext: "219", region: "Region 2", regionalManager: "Region 2 Manager",  regionalEmail: "" },
+  { property: "Grace Townhomes",     manager: "Susan Lopez",            email: "susan@apartmentcorp.com",          ext: "227", region: "Region 2", regionalManager: "Region 2 Manager",  regionalEmail: "" },
+  { property: "Grove Park",          manager: "Nikki Moreno",           email: "grovepark@apartmentcorp.com",      ext: "265", region: "Region 2", regionalManager: "Region 2 Manager",  regionalEmail: "" },
+  { property: "Holiday",             manager: "Arlene Vinson",          email: "holiday@apartmentcorp.com",        ext: "235", region: "Region 2", regionalManager: "Region 2 Manager",  regionalEmail: "" },
+  { property: "La Promesa",          manager: "Ashley Clay",            email: "lapromesa@apartmentcorp.com",      ext: "269", region: "Region 2", regionalManager: "Region 2 Manager",  regionalEmail: "" },
+  { property: "Lexington",           manager: "(No manager listed)",    email: "lexingtonasst@apartmentcorp.com",  ext: "",    region: "Region 2", regionalManager: "Region 2 Manager",  regionalEmail: "" },
+  { property: "Walnut Hill",         manager: "Johann Armstead",        email: "walnut@apartmentcorp.com",         ext: "267", region: "Region 2", regionalManager: "Region 2 Manager",  regionalEmail: "" },
+  { property: "Bayou Pointe",        manager: "Jennifer Frederick",     email: "bayou@apartmentcorp.com",          ext: "298", region: "Region 3", regionalManager: "Ginger Positerry",  regionalEmail: "ginger@apartmentcorp.com" },
+  { property: "Gates of Manhattan",  manager: "Lindgret Celestine",     email: "lindgret@apartmentcorp.com",       ext: "284", region: "Region 3", regionalManager: "Ginger Positerry",  regionalEmail: "ginger@apartmentcorp.com" },
+  { property: "Howell Place",        manager: "Sandra Crump",           email: "howell@apartmentcorp.com",         ext: "259", region: "Region 3", regionalManager: "Ginger Positerry",  regionalEmail: "ginger@apartmentcorp.com" },
+  { property: "Marrero",             manager: "Ketorah Parks",          email: "rubystarmanager@apartmentcorp.com",ext: "283", region: "Region 3", regionalManager: "Ginger Positerry",  regionalEmail: "ginger@apartmentcorp.com" },
+  { property: "North Pointe",        manager: "Jennifer Frederick",     email: "northpointe@apartmentcorp.com",    ext: "297", region: "Region 3", regionalManager: "Ginger Positerry",  regionalEmail: "ginger@apartmentcorp.com" },
+  { property: "Pelican Bay",         manager: "Dequanta Sutherland",    email: "pelican@apartmentcorp.com",        ext: "257", region: "Region 3", regionalManager: "Ginger Positerry",  regionalEmail: "ginger@apartmentcorp.com" },
+  { property: "Pirates Bend",        manager: "Sandra Crump",           email: "pirates@apartmentcorp.com",        ext: "260", region: "Region 3", regionalManager: "Ginger Positerry",  regionalEmail: "ginger@apartmentcorp.com" },
+  { property: "Ruby Diamond",        manager: "Ketorah Parks",          email: "rubystarmanager@apartmentcorp.com",ext: "283", region: "Region 3", regionalManager: "Ginger Positerry",  regionalEmail: "ginger@apartmentcorp.com" },
+  { property: "St. Charles",         manager: "Deon Tolliver",          email: "stcharles@apartmentcorp.com",      ext: "255", region: "Region 3", regionalManager: "Ginger Positerry",  regionalEmail: "ginger@apartmentcorp.com" },
+  { property: "Star",                manager: "Ketorah Parks",          email: "rubystarmanager@apartmentcorp.com",ext: "283", region: "Region 3", regionalManager: "Ginger Positerry",  regionalEmail: "ginger@apartmentcorp.com" },
+  { property: "Thibodaux",           manager: "Susie Rogers",           email: "colonialleasing@apartmentcorp.com",ext: "228", region: "Region 3", regionalManager: "Ginger Positerry",  regionalEmail: "ginger@apartmentcorp.com" },
+  { property: "Windsor / Yorkshire", manager: "Kimberly Powell",        email: "windsor@apartmentcorp.com",        ext: "291", region: "Region 3", regionalManager: "Ginger Positerry",  regionalEmail: "ginger@apartmentcorp.com" },
+  { property: "Anaheim Gardens",     manager: "Priscilla Walters",      email: "priscilla@apartmentcorp.com",      ext: "212", region: "Region 4", regionalManager: "Blake Weddington",  regionalEmail: "blake@apartmentcorp.com" },
+  { property: "Columbia",            manager: "Tammy Davis",            email: "tammy@apartmentcorp.com",          ext: "275", region: "Region 4", regionalManager: "Blake Weddington",  regionalEmail: "blake@apartmentcorp.com" },
+  { property: "Fairfax",             manager: "Shraga Kurs",            email: "alberto@apartmentcorp.com",        ext: "",    region: "Region 4", regionalManager: "Blake Weddington",  regionalEmail: "blake@apartmentcorp.com" },
+  { property: "Forest View",         manager: "Tammy / Heather",        email: "tammy@apartmentcorp.com",          ext: "277", region: "Region 4", regionalManager: "Blake Weddington",  regionalEmail: "blake@apartmentcorp.com" },
+  { property: "Granite Ridge",       manager: "James Abeyta",           email: "james@apartmentcorp.com",          ext: "242", region: "Region 4", regionalManager: "Blake Weddington",  regionalEmail: "blake@apartmentcorp.com" },
+  { property: "Midtown",             manager: "Steve Rand",             email: "alberto@apartmentcorp.com",        ext: "",    region: "Region 4", regionalManager: "Blake Weddington",  regionalEmail: "blake@apartmentcorp.com" },
+  { property: "Oak Hills",           manager: "Heather Hein",           email: "heatherh@apartmentcorp.com",       ext: "279", region: "Region 4", regionalManager: "Blake Weddington",  regionalEmail: "blake@apartmentcorp.com" },
+  { property: "Pacific",             manager: "Hailey Huber",           email: "pacificpointe@apartmentcorp.com",  ext: "243", region: "Region 4", regionalManager: "Blake Weddington",  regionalEmail: "blake@apartmentcorp.com" },
+  { property: "River Garden",        manager: "Heather Snyder",         email: "rivergarden@apartmentcorp.com",    ext: "252", region: "Region 4", regionalManager: "Blake Weddington",  regionalEmail: "blake@apartmentcorp.com" },
+  { property: "Urban",               manager: "Amunique Cannon",        email: "alberto@apartmentcorp.com",        ext: "",    region: "Region 4", regionalManager: "Blake Weddington",  regionalEmail: "blake@apartmentcorp.com" },
+  { property: "Wilmington",          manager: "Alberto Spence",         email: "alberto@apartmentcorp.com",        ext: "211", region: "Region 4", regionalManager: "Blake Weddington",  regionalEmail: "blake@apartmentcorp.com" },
 ];
 
 const contactMap = Object.fromEntries(CONTACTS.map((c) => [c.property, c]));
@@ -553,32 +554,72 @@ function SummaryModal({ xedProperties, checkedCount, monthLabel, state, onClose 
   state: InspectionState;
   onClose: () => void;
 }) {
-  // Group X properties by region
+  const notReviewed = TOTAL - Object.values(state).filter((s) => s.checked || s.xed).length;
   const byRegion = REGIONS.map((r) => ({
     name: r.name,
     xed: r.properties.filter((p) => state[buildKey(r.name, p)]?.xed),
-    checked: r.properties.filter((p) => state[buildKey(r.name, p)]?.checked && !state[buildKey(r.name, p)]?.xed),
   })).filter((r) => r.xed.length > 0);
+
+  const printSummary = () => {
+    const rows = byRegion.map((r) =>
+      `<div style="margin-bottom:10px">
+        <div style="background:#1e2d4a;color:white;padding:3px 8px;font-size:8pt;font-weight:bold;letter-spacing:1px;text-transform:uppercase;border-radius:3px">${r.name}</div>
+        <table style="width:100%;border-collapse:collapse;margin-top:3px">
+          ${r.xed.map((prop) => {
+            const c = contactMap[prop];
+            return `<tr style="border-bottom:1px solid #fee2e2">
+              <td style="padding:3px 6px;font-size:8pt;font-weight:600;color:#991b1b;width:40%">${prop}</td>
+              <td style="padding:3px 6px;font-size:8pt;color:#b91c1c">${c ? c.manager : ""}</td>
+              <td style="padding:3px 6px;font-size:8pt;color:#b91c1c">${c?.ext ? "Ext. " + c.ext : ""}</td>
+              <td style="padding:3px 6px;font-size:7pt;color:#dc2626;text-align:right">✗</td>
+            </tr>`;
+          }).join("")}
+        </table>
+      </div>`
+    ).join("");
+
+    const win = window.open("", "_blank");
+    if (!win) return;
+    win.document.write(`<!DOCTYPE html><html><head><title>Inspection Summary — ${monthLabel}</title>
+      <style>@page{size:letter portrait;margin:0.4in 0.5in} body{font-family:Arial,sans-serif;font-size:9pt} h1{font-size:14pt;margin:0} p{margin:2px 0;font-size:8pt;color:#555}</style>
+    </head><body>
+      <div style="background:#1e2d4a;color:white;padding:8px 12px;border-radius:4px;margin-bottom:10px">
+        <h1>Monthly Inspections — Summary</h1>
+        <p style="color:#93b4d8">${monthLabel} &nbsp;|&nbsp; Due: 21st of Every Month</p>
+      </div>
+      <div style="display:flex;gap:20px;margin-bottom:10px;border:1px solid #e5e7eb;border-radius:4px;overflow:hidden">
+        <div style="flex:1;text-align:center;padding:6px"><div style="font-size:18pt;font-weight:bold;color:#16a34a">${checkedCount}</div><div style="font-size:7pt;color:#6b7280">Completed</div></div>
+        <div style="flex:1;text-align:center;padding:6px;border-left:1px solid #e5e7eb;border-right:1px solid #e5e7eb"><div style="font-size:18pt;font-weight:bold;color:#dc2626">${xedProperties.length}</div><div style="font-size:7pt;color:#6b7280">Not Done / Issues</div></div>
+        <div style="flex:1;text-align:center;padding:6px"><div style="font-size:18pt;font-weight:bold;color:#9ca3af">${notReviewed}</div><div style="font-size:7pt;color:#6b7280">Not Reviewed</div></div>
+      </div>
+      ${xedProperties.length === 0 ? '<p style="text-align:center;color:#16a34a;font-weight:bold">✅ No issues this month!</p>' : rows}
+      <div style="margin-top:14px;font-size:7pt;color:#9ca3af;border-top:1px solid #e5e7eb;padding-top:6px">Printed: ${new Date().toLocaleString()} &nbsp;|&nbsp; ApartmentCorp Monthly Inspections</div>
+    </body></html>`);
+    win.document.close();
+    setTimeout(() => { win.print(); }, 300);
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.55)" }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col overflow-hidden"
-        style={{ animation: "modalIn 0.2s cubic-bezier(0.23,1,0.32,1)" }}>
-        <div className="bg-[#1e2d4a] px-6 py-4 flex items-center justify-between">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg flex flex-col" style={{ animation: "modalIn 0.2s cubic-bezier(0.23,1,0.32,1)", maxHeight: "calc(100vh - 2rem)" }}>
+        <div className="bg-[#1e2d4a] px-6 py-4 flex items-center justify-between flex-shrink-0">
           <div>
-            <h2 className="text-white font-bold text-lg" style={{ fontFamily: "Georgia, serif" }}>
-              Inspection Summary
-            </h2>
+            <h2 className="text-white font-bold text-lg" style={{ fontFamily: "Georgia, serif" }}>Inspection Summary</h2>
             <p className="text-[#93b4d8] text-xs mt-0.5">{monthLabel}</p>
           </div>
-          <button onClick={onClose} className="text-white/60 hover:text-white transition-colors p-1 rounded">
-            <XIcon className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={printSummary} title="Print summary" className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-white/10 hover:bg-white/20 text-white text-xs font-medium transition-all active:scale-95">
+              <Printer className="w-3.5 h-3.5" /> Print
+            </button>
+            <button onClick={onClose} className="text-white/60 hover:text-white transition-colors p-1 rounded">
+              <XIcon className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Stats row */}
-        <div className="grid grid-cols-3 divide-x divide-gray-200 border-b border-gray-200">
+        <div className="grid grid-cols-3 divide-x divide-gray-200 border-b border-gray-200 flex-shrink-0">
           <div className="px-4 py-3 text-center">
             <div className="text-2xl font-bold text-green-600">{checkedCount}</div>
             <div className="text-xs text-gray-500 mt-0.5">Completed</div>
@@ -588,12 +629,12 @@ function SummaryModal({ xedProperties, checkedCount, monthLabel, state, onClose 
             <div className="text-xs text-gray-500 mt-0.5">Not Done / Issues</div>
           </div>
           <div className="px-4 py-3 text-center">
-            <div className="text-2xl font-bold text-gray-400">{TOTAL - checkedCount - xedProperties.filter(p => !Object.values(REGIONS).flatMap(r => r.properties).includes(p) || !state[Object.keys(state).find(k => k.endsWith(`::${p}`)) || ""]?.checked).length}</div>
+            <div className="text-2xl font-bold text-gray-400">{notReviewed}</div>
             <div className="text-xs text-gray-500 mt-0.5">Not Reviewed</div>
           </div>
         </div>
 
-        <div className="overflow-y-auto flex-1 px-6 py-4">
+        <div className="overflow-y-auto px-6 py-4" style={{ flex: "1 1 0", minHeight: 0 }}>
           {xedProperties.length === 0 ? (
             <div className="text-center py-10">
               <div className="text-4xl mb-3">✅</div>
@@ -615,11 +656,11 @@ function SummaryModal({ xedProperties, checkedCount, monthLabel, state, onClose 
                       const c = contactMap[prop];
                       return (
                         <li key={prop} className="flex items-center justify-between px-3 py-2 bg-red-50 border border-red-100 rounded">
-                          <div>
+                          <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-sm font-semibold text-red-800">{prop}</span>
-                            {c && <span className="text-xs text-red-500 ml-2">— {c.manager}</span>}
+                            {c && <span className="text-xs text-red-500">— {c.manager}{c.ext ? <span className="ml-1 text-red-400">Ext. {c.ext}</span> : ""}</span>}
                           </div>
-                          <span className="text-red-500 font-bold text-sm">✗</span>
+                          <span className="text-red-500 font-bold text-sm flex-shrink-0 ml-2">✗</span>
                         </li>
                       );
                     })}
@@ -630,7 +671,7 @@ function SummaryModal({ xedProperties, checkedCount, monthLabel, state, onClose 
           )}
         </div>
 
-        <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end">
+        <div className="px-6 py-3 border-t border-gray-200 bg-gray-50 flex justify-end flex-shrink-0">
           <button onClick={onClose} className="px-4 py-2 bg-[#1e2d4a] hover:bg-[#2a3f6b] text-white text-sm font-medium rounded-md transition-all active:scale-95">
             Close
           </button>
