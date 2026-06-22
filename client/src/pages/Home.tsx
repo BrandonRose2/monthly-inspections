@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, DragEvent } from "react";
-import { Printer, RotateCcw, Mail, X as XIcon, Copy, Check, FileText, Upload, Eye, Trash2, ChevronLeft, ChevronRight, ClipboardList, GitCompare } from "lucide-react";
+import { Printer, RotateCcw, Mail, X as XIcon, Copy, Check, FileText, Upload, Eye, Trash2, ChevronLeft, ChevronRight, ClipboardList, GitCompare, Download, FolderOpen } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -232,6 +232,38 @@ export default function Home() {
     }
   };
 
+  const importRef = useRef<HTMLInputElement>(null);
+
+  const handleExport = () => {
+    const json = JSON.stringify(allData, null, 2);
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `monthly-inspections-backup-${new Date().toISOString().slice(0,10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const parsed = JSON.parse(ev.target?.result as string);
+        if (typeof parsed === "object" && parsed !== null) {
+          setAllData((prev) => ({ ...prev, ...parsed }));
+          alert(`✅ Data imported successfully! ${Object.keys(parsed).length} month(s) restored.`);
+        } else {
+          alert("Invalid backup file.");
+        }
+      } catch { alert("Could not read file. Make sure it's a valid backup."); }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  };
+
   const copyToClipboard = (text: string, idx: number) => {
     navigator.clipboard.writeText(text).then(() => { setCopiedIdx(idx); setTimeout(() => setCopiedIdx(null), 2000); });
   };
@@ -294,6 +326,13 @@ export default function Home() {
               <button onClick={() => window.print()} className="flex items-center gap-1.5 px-3 py-2 rounded-md bg-white/10 hover:bg-white/20 text-white text-sm transition-all active:scale-95">
                 <Printer className="w-4 h-4" /> Print
               </button>
+              <button onClick={handleExport} className="flex items-center gap-1.5 px-3 py-2 rounded-md bg-white/10 hover:bg-white/20 text-white text-sm transition-all active:scale-95" title="Export all data as backup file">
+                <Download className="w-4 h-4" /> Export
+              </button>
+              <button onClick={() => importRef.current?.click()} className="flex items-center gap-1.5 px-3 py-2 rounded-md bg-white/10 hover:bg-white/20 text-white text-sm transition-all active:scale-95" title="Import data from backup file">
+                <FolderOpen className="w-4 h-4" /> Import
+              </button>
+              <input ref={importRef} type="file" accept=".json" className="hidden" onChange={handleImport} />
               <button onClick={handleReset} className="flex items-center gap-1.5 px-3 py-2 rounded-md bg-white/10 hover:bg-white/20 text-white text-sm transition-all active:scale-95">
                 <RotateCcw className="w-4 h-4" /> Reset
               </button>
