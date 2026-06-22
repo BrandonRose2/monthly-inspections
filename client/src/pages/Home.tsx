@@ -627,7 +627,7 @@ function SummaryModal({ xedProperties, checkedCount, monthLabel, state, onClose 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.55)" }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg flex flex-col" style={{ animation: "modalIn 0.2s cubic-bezier(0.23,1,0.32,1)", maxHeight: "calc(100vh - 2rem)" }}>
+      <div className="bg-white rounded-xl shadow-2xl w-full flex flex-col" style={{ animation: "modalIn 0.2s cubic-bezier(0.23,1,0.32,1)", maxWidth: "min(860px, calc(100vw - 2rem))", maxHeight: "calc(100vh - 2rem)", height: "calc(100vh - 4rem)" }}>
         <div className="bg-[#1e2d4a] px-6 py-4 flex items-center justify-between flex-shrink-0">
           <div>
             <h2 className="text-white font-bold text-lg" style={{ fontFamily: "Georgia, serif" }}>Inspection Summary</h2>
