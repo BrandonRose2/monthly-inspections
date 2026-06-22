@@ -44,7 +44,7 @@ const CONTACTS: PropertyContact[] = [
   { property: "River Pointe",        manager: "Stephanie Delong",       email: "stephanie@apartmentcorp.com",      ext: "224", region: "Region 1", regionalManager: "JR Rolon",          regionalEmail: "jrrolon@apartmentcorp.com" },
   { property: "Silver Springs",      manager: "Tarshia Pierce",         email: "silversprings@apartmentcorp.com",  ext: "245", region: "Region 1", regionalManager: "Leslie Rolon",      regionalEmail: "leslie@apartmentcorp.com" },
   { property: "Thomasville",         manager: "Ebony Nelson",           email: "thomasville@apartmentcorp.com",    ext: "295", region: "Region 1", regionalManager: "Leslie Rolon",      regionalEmail: "leslie@apartmentcorp.com" },
-  { property: "Breckenridge",        manager: "(No manager listed)",    email: "lexingtonasst@apartmentcorp.com",  ext: "",    region: "Region 2", regionalManager: "Region 2 Manager",  regionalEmail: "" },
+  { property: "Breckenridge",        manager: "Susan Lopez",            email: "susan@apartmentcorp.com",          ext: "227", region: "Region 2", regionalManager: "Region 2 Manager",  regionalEmail: "" },
   { property: "Crossroads",          manager: "Jennifer Parks",         email: "crossroads@apartmentcorp.com",     ext: "273", region: "Region 2", regionalManager: "Region 2 Manager",  regionalEmail: "" },
   { property: "Cumberland",          manager: "Kiara Brown",            email: "cumberland@apartmentcorp.com",     ext: "219", region: "Region 2", regionalManager: "Region 2 Manager",  regionalEmail: "" },
   { property: "Grace Townhomes",     manager: "Susan Lopez",            email: "susan@apartmentcorp.com",          ext: "227", region: "Region 2", regionalManager: "Region 2 Manager",  regionalEmail: "" },
