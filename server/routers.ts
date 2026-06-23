@@ -3,7 +3,7 @@ import { z } from "zod";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
-import { deleteMonthRecords, getMonthRecords, getSavedMonthKeys, upsertInspectionRecord } from "./db";
+import { deleteAllRecords, deleteMonthRecords, getMonthRecords, getSavedMonthKeys, upsertInspectionRecord } from "./db";
 import { storagePut } from "./storage";
 
 export const appRouter = router({
@@ -58,6 +58,12 @@ export const appRouter = router({
         return { success: true };
       }),
 
+    resetAllData: publicProcedure
+      .mutation(async () => {
+        await deleteAllRecords();
+        return { success: true };
+      }),
+
     uploadPdf: publicProcedure
       .input(
         z.object({
@@ -72,7 +78,8 @@ export const appRouter = router({
       .mutation(async ({ input }) => {
         const buffer = Buffer.from(input.fileBase64, "base64");
         const safeProperty = input.property.replace(/[^a-zA-Z0-9]/g, "_");
-        const key = `inspections/${input.monthKey}/${safeProperty}/${Date.now()}_${input.fileName}`;
+        const safeFileName = input.fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
+        const key = `inspections/${input.monthKey}/${safeProperty}/${Date.now()}_${safeFileName}`;
         const { url } = await storagePut(key, buffer, "application/pdf");
         return { key, url };
       }),
@@ -121,7 +128,8 @@ export const appRouter = router({
                 if (base64) {
                   const buffer = Buffer.from(base64, "base64");
                   const safeProperty = property.replace(/[^a-zA-Z0-9]/g, "_");
-                  const key = `inspections/${monthKey}/${safeProperty}/${Date.now()}_${status.pdf.name}`;
+                  const safeFileName = status.pdf.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+                  const key = `inspections/${monthKey}/${safeProperty}/${Date.now()}_${safeFileName}`;
                   const { url } = await storagePut(key, buffer, "application/pdf");
                   pdfKey = url;
                   pdfName = status.pdf.name;

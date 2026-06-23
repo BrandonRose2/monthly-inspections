@@ -146,3 +146,9 @@ export async function getSavedMonthKeys(): Promise<string[]> {
     .from(inspectionRecords);
   return rows.map((r) => r.monthKey);
 }
+
+export async function deleteAllRecords(): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(inspectionRecords);
+}

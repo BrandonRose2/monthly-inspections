@@ -321,9 +321,22 @@ export default function Home() {
     onSuccess: () => { refetchCurrent(); refetchMonths(); setLocalOverlay({}); },
   });
 
+  const resetAllDataMutation = trpc.inspections.resetAllData.useMutation({
+    onSuccess: () => { refetchCurrent(); refetchMonths(); setLocalOverlay({}); alert("✅ All data cleared. You can now re-import your backup."); },
+    onError: (err) => alert(`Reset failed: ${err.message}`),
+  });
+
   const handleReset = () => {
     if (window.confirm(`Reset all inspection marks for ${monthLabel}?`)) {
       resetMonthMutation.mutate({ monthKey: mk });
+    }
+  };
+
+  const handleResetAll = () => {
+    if (window.confirm("⚠️ This will permanently delete ALL inspection data across ALL months. This cannot be undone.\n\nAre you sure?")) {
+      if (window.confirm("Last chance — delete everything and start fresh?")) {
+        resetAllDataMutation.mutate();
+      }
     }
   };
 
@@ -445,9 +458,19 @@ export default function Home() {
                 <FolderOpen className="w-4 h-4" /> {importing ? "Importing..." : "Import"}
               </button>
               <input ref={importRef} type="file" accept=".json" className="hidden" onChange={handleImport} />
-              <button onClick={handleReset} className="flex items-center gap-1.5 px-3 py-2 rounded-md bg-white/10 hover:bg-white/20 text-white text-sm transition-all active:scale-95">
-                <RotateCcw className="w-4 h-4" /> Reset
-              </button>
+              <div className="relative group">
+                <button onClick={handleReset} className="flex items-center gap-1.5 px-3 py-2 rounded-md bg-white/10 hover:bg-white/20 text-white text-sm transition-all active:scale-95">
+                  <RotateCcw className="w-4 h-4" /> Reset
+                </button>
+                <div className="absolute right-0 top-full mt-1 bg-[#1e2d4a] border border-white/20 rounded-lg shadow-xl z-50 min-w-[160px] opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-150">
+                  <button onClick={handleReset} className="w-full text-left px-4 py-2.5 text-sm text-white hover:bg-white/10 rounded-t-lg transition-colors">
+                    Reset {monthLabel}
+                  </button>
+                  <button onClick={handleResetAll} className="w-full text-left px-4 py-2.5 text-sm text-red-400 hover:bg-white/10 rounded-b-lg transition-colors border-t border-white/10">
+                    Reset All Data
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
 
