@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, DragEvent } from "react";
 import { trpc } from "@/lib/trpc";
-import { Printer, RotateCcw, Mail, X as XIcon, Copy, Check, FileText, Upload, Eye, Trash2, ChevronLeft, ChevronRight, ClipboardList, GitCompare, Download, FolderOpen } from "lucide-react";
+import { Printer, RotateCcw, Mail, X as XIcon, Copy, Check, FileText, Upload, Eye, Trash2, ChevronLeft, ChevronRight, ClipboardList, GitCompare, Download, FolderOpen, History, TrendingUp, TrendingDown, Minus, CheckCircle2, XCircle, FileBarChart2 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -155,6 +155,7 @@ export default function Home() {
   const [showEmailModal, setShowEmailModal]     = useState(false);
   const [showSummaryModal, setShowSummaryModal] = useState(false);
   const [showCompareModal, setShowCompareModal] = useState(false);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [copiedIdx, setCopiedIdx]         = useState<number | null>(null);
 
   // ── Cloud DB queries ──
@@ -418,6 +419,14 @@ export default function Home() {
               </p>
             </div>
             <div className="flex gap-2 flex-wrap print:hidden items-center">
+              {/* History button */}
+              <button
+                onClick={() => setShowHistoryModal(true)}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-md bg-white/10 hover:bg-white/20 text-white text-sm font-medium transition-all active:scale-95"
+              >
+                <History className="w-4 h-4" />
+                History
+              </button>
               {/* Compare button */}
               <button
                 onClick={() => setShowCompareModal(true)}
@@ -578,6 +587,11 @@ export default function Home() {
       </main>
 
       {/* ── Compare Modal ── */}
+      {/* ── History Modal ── */}
+      {showHistoryModal && (
+        <HistoryModal onClose={() => setShowHistoryModal(false)} onNavigate={(year, month) => { setSelectedYear(year); setSelectedMonth(month); setShowHistoryModal(false); }} />
+      )}
+
       {showCompareModal && (
         <CompareModal
           currentState={mergedState}
@@ -1212,6 +1226,187 @@ function CompareModal({ currentState, prevState, currentLabel, prevLabel, onClos
 
         <div className="px-6 py-3 border-t border-gray-200 bg-gray-50 flex justify-end flex-shrink-0 rounded-b-xl">
           <button onClick={onClose} className="px-4 py-2 bg-[#1e2d4a] hover:bg-[#2a3f6b] text-white text-sm font-medium rounded-md transition-all active:scale-95">
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── History Modal ────────────────────────────────────────────────────────────
+
+function HistoryModal({ onClose, onNavigate }: {
+  onClose: () => void;
+  onNavigate: (year: number, month: number) => void;
+}) {
+  const { data: history = [], isLoading } = trpc.inspections.getHistory.useQuery();
+
+  const formatMonthLabel = (mk: string) => {
+    const [y, m] = mk.split("-");
+    return `${MONTHS[parseInt(m, 10) - 1]} ${y}`;
+  };
+
+  // Compute trend vs previous month in the list (history is sorted newest-first)
+  const getTrend = (idx: number, field: "passed" | "failed") => {
+    if (idx >= history.length - 1) return null;
+    const curr = history[idx][field];
+    const prev = history[idx + 1][field];
+    if (curr > prev) return "up";
+    if (curr < prev) return "down";
+    return "flat";
+  };
+
+  // Overall stats across all months
+  const totalMonths = history.length;
+  const avgPassed = totalMonths > 0 ? Math.round(history.reduce((s, h) => s + h.passed, 0) / totalMonths) : 0;
+  const avgFailed = totalMonths > 0 ? Math.round(history.reduce((s, h) => s + h.failed, 0) / totalMonths) : 0;
+  const bestMonth = history.length > 0 ? history.reduce((best, h) => h.passed > best.passed ? h : best, history[0]) : null;
+  const worstMonth = history.length > 0 ? history.reduce((worst, h) => h.failed > worst.failed ? h : worst, history[0]) : null;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.6)" }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div
+        className="bg-white rounded-xl shadow-2xl w-full flex flex-col"
+        style={{ animation: "modalIn 0.2s cubic-bezier(0.23,1,0.32,1)", maxWidth: "min(1000px, calc(100vw - 2rem))", maxHeight: "calc(100vh - 2rem)", height: "calc(100vh - 4rem)" }}
+      >
+        {/* Header */}
+        <div className="bg-[#1e2d4a] px-6 py-4 flex items-center justify-between flex-shrink-0 rounded-t-xl">
+          <div className="flex items-center gap-3">
+            <FileBarChart2 className="w-5 h-5 text-[#93b4d8]" />
+            <div>
+              <h2 className="text-white font-bold text-lg" style={{ fontFamily: "Georgia, serif" }}>Inspection History</h2>
+              <p className="text-[#93b4d8] text-xs mt-0.5">{totalMonths} month{totalMonths !== 1 ? "s" : ""} on record — click any card to view that month</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-white/60 hover:text-white transition-colors p-1 rounded">
+            <XIcon className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Summary stats bar */}
+        {totalMonths > 0 && (
+          <div className="grid grid-cols-4 divide-x divide-gray-200 border-b border-gray-200 flex-shrink-0 bg-gray-50">
+            <div className="px-5 py-3 text-center">
+              <div className="text-2xl font-bold text-[#1e2d4a]">{totalMonths}</div>
+              <div className="text-xs text-gray-500 mt-0.5">Months Tracked</div>
+            </div>
+            <div className="px-5 py-3 text-center">
+              <div className="text-2xl font-bold text-green-600">{avgPassed}</div>
+              <div className="text-xs text-gray-500 mt-0.5">Avg Passed / Month</div>
+            </div>
+            <div className="px-5 py-3 text-center">
+              <div className="text-2xl font-bold text-red-500">{avgFailed}</div>
+              <div className="text-xs text-gray-500 mt-0.5">Avg Issues / Month</div>
+            </div>
+            <div className="px-5 py-3 text-center">
+              <div className="text-sm font-semibold text-[#1e2d4a] truncate">{bestMonth ? formatMonthLabel(bestMonth.monthKey) : "—"}</div>
+              <div className="text-xs text-gray-500 mt-0.5">Best Month ({bestMonth?.passed ?? 0} passed)</div>
+            </div>
+          </div>
+        )}
+
+        {/* Grid body */}
+        <div className="flex-1 overflow-y-auto p-5">
+          {isLoading ? (
+            <div className="flex items-center justify-center h-40 text-gray-400 text-sm">Loading history…</div>
+          ) : history.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-40 gap-3 text-gray-400">
+              <History className="w-10 h-10 opacity-30" />
+              <p className="text-sm">No saved months yet. Complete and save a month to see it here.</p>
+            </div>
+          ) : (
+            <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))" }}>
+              {history.map((h, idx) => {
+                const [y, m] = h.monthKey.split("-");
+                const passRate = h.total > 0 ? Math.round((h.passed / h.total) * 100) : 0;
+                const failRate = h.total > 0 ? Math.round((h.failed / h.total) * 100) : 0;
+                const passedTrend = getTrend(idx, "passed");
+                const failedTrend = getTrend(idx, "failed");
+                const isGoodMonth = h.passed >= h.failed && h.failed <= 5;
+
+                return (
+                  <button
+                    key={h.monthKey}
+                    onClick={() => onNavigate(parseInt(y, 10), parseInt(m, 10) - 1)}
+                    className="text-left rounded-xl border border-gray-200 bg-white hover:border-[#1e2d4a] hover:shadow-md transition-all duration-150 p-4 group active:scale-[0.98]"
+                  >
+                    {/* Month label + badge */}
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <div className="font-bold text-[#1e2d4a] text-base leading-tight group-hover:text-[#2a3f6a] transition-colors">
+                          {MONTHS[parseInt(m, 10) - 1]}
+                        </div>
+                        <div className="text-xs text-gray-400 font-medium">{y}</div>
+                      </div>
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${isGoodMonth ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"}`}>
+                        {isGoodMonth ? "✓ Good" : "⚠ Issues"}
+                      </span>
+                    </div>
+
+                    {/* Pass bar */}
+                    <div className="mb-3">
+                      <div className="flex justify-between text-xs text-gray-500 mb-1">
+                        <span>Completion</span>
+                        <span className="font-medium text-gray-700">{passRate + failRate}%</span>
+                      </div>
+                      <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
+                        <div className="h-full flex">
+                          <div className="bg-green-500 h-full transition-all" style={{ width: `${passRate}%` }} />
+                          <div className="bg-red-400 h-full transition-all" style={{ width: `${failRate}%` }} />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Stats row */}
+                    <div className="grid grid-cols-3 gap-1 text-center">
+                      <div className="bg-green-50 rounded-lg py-1.5 px-1">
+                        <div className="flex items-center justify-center gap-0.5">
+                          <span className="font-bold text-green-700 text-sm">{h.passed}</span>
+                          {passedTrend === "up" && <TrendingUp className="w-3 h-3 text-green-500" />}
+                          {passedTrend === "down" && <TrendingDown className="w-3 h-3 text-red-400" />}
+                          {passedTrend === "flat" && <Minus className="w-3 h-3 text-gray-400" />}
+                        </div>
+                        <div className="text-[10px] text-green-600 font-medium">Passed</div>
+                      </div>
+                      <div className="bg-red-50 rounded-lg py-1.5 px-1">
+                        <div className="flex items-center justify-center gap-0.5">
+                          <span className="font-bold text-red-600 text-sm">{h.failed}</span>
+                          {failedTrend === "up" && <TrendingUp className="w-3 h-3 text-red-500" />}
+                          {failedTrend === "down" && <TrendingDown className="w-3 h-3 text-green-500" />}
+                          {failedTrend === "flat" && <Minus className="w-3 h-3 text-gray-400" />}
+                        </div>
+                        <div className="text-[10px] text-red-500 font-medium">Issues</div>
+                      </div>
+                      <div className="bg-blue-50 rounded-lg py-1.5 px-1">
+                        <div className="font-bold text-blue-600 text-sm">{h.pdfs}</div>
+                        <div className="text-[10px] text-blue-500 font-medium">PDFs</div>
+                      </div>
+                    </div>
+
+                    {/* Not reviewed warning */}
+                    {h.neither > 0 && (
+                      <div className="mt-2 text-[10px] text-amber-600 bg-amber-50 rounded px-2 py-1 text-center font-medium">
+                        {h.neither} not reviewed
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="border-t border-gray-200 px-6 py-3 flex items-center justify-between flex-shrink-0 bg-gray-50 rounded-b-xl">
+          <p className="text-xs text-gray-400">
+            {worstMonth && `Most issues: ${formatMonthLabel(worstMonth.monthKey)} (${worstMonth.failed} issues)`}
+          </p>
+          <button onClick={onClose} className="px-4 py-1.5 rounded-lg bg-[#1e2d4a] text-white text-sm font-medium hover:bg-[#2a3f6a] transition-colors active:scale-95">
             Close
           </button>
         </div>

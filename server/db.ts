@@ -152,3 +152,35 @@ export async function deleteAllRecords(): Promise<void> {
   if (!db) return;
   await db.delete(inspectionRecords);
 }
+
+export interface MonthSummary {
+  monthKey: string;
+  total: number;
+  passed: number;   // checked = true
+  failed: number;   // xed = true
+  pdfs: number;     // pdfKey is not null
+  neither: number;  // neither checked nor xed
+}
+
+export async function getHistorySummary(): Promise<MonthSummary[]> {
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db.select().from(inspectionRecords);
+
+  // Group by monthKey in JS (avoids complex SQL aggregation)
+  const map = new Map<string, MonthSummary>();
+  for (const row of rows) {
+    if (!map.has(row.monthKey)) {
+      map.set(row.monthKey, { monthKey: row.monthKey, total: 0, passed: 0, failed: 0, pdfs: 0, neither: 0 });
+    }
+    const s = map.get(row.monthKey)!;
+    s.total++;
+    if (row.checked) s.passed++;
+    if (row.xed) s.failed++;
+    if (row.pdfKey) s.pdfs++;
+    if (!row.checked && !row.xed) s.neither++;
+  }
+
+  // Sort descending (newest first)
+  return Array.from(map.values()).sort((a, b) => b.monthKey.localeCompare(a.monthKey));
+}
