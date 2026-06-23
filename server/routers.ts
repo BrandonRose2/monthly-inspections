@@ -76,6 +76,87 @@ export const appRouter = router({
         const { url } = await storagePut(key, buffer, "application/pdf");
         return { key, url };
       }),
+
+    // Import a full backup JSON — uploads PDFs to S3 and saves all records to DB
+    importBackup: publicProcedure
+      .input(
+        z.object({
+          months: z.record(
+            z.string(), // monthKey "YYYY-MM"
+            z.record(
+              z.string(), // "Region X::Property Name"
+              z.object({
+                checked: z.boolean().optional(),
+                xed: z.boolean().optional(),
+                note: z.string().optional().nullable(),
+                pdf: z.object({
+                  name: z.string(),
+                  dataUrl: z.string(),
+                  size: z.number(),
+                  uploadedAt: z.string(),
+                }).optional().nullable(),
+              })
+            )
+          ),
+        })
+      )
+      .mutation(async ({ input }) => {
+        let imported = 0;
+        let pdfUploaded = 0;
+        for (const [monthKey, entries] of Object.entries(input.months)) {
+          for (const [compositeKey, status] of Object.entries(entries)) {
+            const [region, ...propParts] = compositeKey.split("::");
+            const property = propParts.join("::");
+            if (!region || !property) continue;
+
+            let pdfKey: string | undefined;
+            let pdfName: string | undefined;
+            let pdfSize: number | undefined;
+            let pdfUploadedAt: string | undefined;
+
+            // If there's a PDF with a dataUrl, upload it to S3
+            if (status.pdf?.dataUrl?.startsWith("data:")) {
+              try {
+                const base64 = status.pdf.dataUrl.split(",")[1];
+                if (base64) {
+                  const buffer = Buffer.from(base64, "base64");
+                  const safeProperty = property.replace(/[^a-zA-Z0-9]/g, "_");
+                  const key = `inspections/${monthKey}/${safeProperty}/${Date.now()}_${status.pdf.name}`;
+                  const { url } = await storagePut(key, buffer, "application/pdf");
+                  pdfKey = url;
+                  pdfName = status.pdf.name;
+                  pdfSize = status.pdf.size;
+                  pdfUploadedAt = status.pdf.uploadedAt;
+                  pdfUploaded++;
+                }
+              } catch (e) {
+                console.error(`Failed to upload PDF for ${property}:`, e);
+              }
+            } else if (status.pdf?.dataUrl) {
+              // Already a storage URL (not base64)
+              pdfKey = status.pdf.dataUrl;
+              pdfName = status.pdf.name;
+              pdfSize = status.pdf.size;
+              pdfUploadedAt = status.pdf.uploadedAt;
+            }
+
+            await upsertInspectionRecord({
+              monthKey,
+              region,
+              property,
+              checked: status.checked ?? false,
+              xed: status.xed ?? false,
+              note: status.note ?? undefined,
+              pdfName,
+              pdfKey,
+              pdfSize,
+              pdfUploadedAt,
+            });
+            imported++;
+          }
+        }
+        return { success: true, imported, pdfUploaded };
+      }),
   }),
 });
 

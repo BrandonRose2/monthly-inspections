@@ -343,6 +343,17 @@ export default function Home() {
     URL.revokeObjectURL(url);
   };
 
+  const importBackupMutation = trpc.inspections.importBackup.useMutation({
+    onSuccess: (result) => {
+      refetchCurrent();
+      refetchMonths();
+      alert(`✅ Imported ${result.imported} records (${result.pdfUploaded} PDFs uploaded to cloud) from your backup!`);
+    },
+    onError: (err) => alert(`Import failed: ${err.message}`),
+  });
+
+  const [importing, setImporting] = useState(false);
+
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -351,37 +362,16 @@ export default function Home() {
       try {
         const parsed = JSON.parse(ev.target?.result as string);
         if (typeof parsed === "object" && parsed !== null) {
-          let count = 0;
-          for (const [importMk, importState] of Object.entries(parsed as Record<string, InspectionState>)) {
-            for (const region of REGIONS) {
-              for (const property of region.properties) {
-                const key = buildKey(region.name, property);
-                const s = (importState as InspectionState)[key];
-                if (s && (s.checked || s.xed || s.note || s.pdf)) {
-                  await upsertMutation.mutateAsync({
-                    monthKey: importMk,
-                    region: region.name,
-                    property,
-                    checked: s.checked ?? false,
-                    xed: s.xed ?? false,
-                    note: s.note,
-                    pdfName: s.pdf?.name,
-                    pdfKey: s.pdf?.dataUrl,
-                    pdfSize: s.pdf?.size,
-                    pdfUploadedAt: s.pdf?.uploadedAt,
-                  });
-                  count++;
-                }
-              }
-            }
-          }
-          refetchCurrent();
-          refetchMonths();
-          alert(`✅ Imported ${count} property records from ${Object.keys(parsed).length} month(s) into the cloud database!`);
+          setImporting(true);
+          await importBackupMutation.mutateAsync({ months: parsed });
+          setImporting(false);
         } else {
           alert("Invalid backup file.");
         }
-      } catch { alert("Could not read file. Make sure it's a valid backup."); }
+      } catch (err: any) {
+        setImporting(false);
+        alert(`Could not import: ${err?.message || "Unknown error"}`);
+      }
     };
     reader.readAsText(file);
     e.target.value = "";
@@ -451,8 +441,8 @@ export default function Home() {
               <button onClick={handleExport} className="flex items-center gap-1.5 px-3 py-2 rounded-md bg-white/10 hover:bg-white/20 text-white text-sm transition-all active:scale-95" title="Export all data as backup file">
                 <Download className="w-4 h-4" /> Export
               </button>
-              <button onClick={() => importRef.current?.click()} className="flex items-center gap-1.5 px-3 py-2 rounded-md bg-white/10 hover:bg-white/20 text-white text-sm transition-all active:scale-95" title="Import data from backup file">
-                <FolderOpen className="w-4 h-4" /> Import
+              <button onClick={() => !importing && importRef.current?.click()} disabled={importing} className={`flex items-center gap-1.5 px-3 py-2 rounded-md text-white text-sm transition-all active:scale-95 ${importing ? "bg-white/5 cursor-not-allowed opacity-60" : "bg-white/10 hover:bg-white/20"}`} title="Import data from backup file">
+                <FolderOpen className="w-4 h-4" /> {importing ? "Importing..." : "Import"}
               </button>
               <input ref={importRef} type="file" accept=".json" className="hidden" onChange={handleImport} />
               <button onClick={handleReset} className="flex items-center gap-1.5 px-3 py-2 rounded-md bg-white/10 hover:bg-white/20 text-white text-sm transition-all active:scale-95">
