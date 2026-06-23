@@ -481,27 +481,33 @@ export default function Home() {
 
       <style>{`
         @media print {
-          @page { size: letter landscape; margin: 0.3in 0.35in; }
-          * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+          @page { size: letter landscape; margin: 0.2in 0.25in; }
+          * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box !important; }
+          html, body { height: auto !important; overflow: visible !important; }
           .print\\:hidden { display: none !important; }
-          body { background: white !important; font-size: 7.5pt !important; }
-          header { background: #1e2d4a !important; padding: 6px 12px !important; }
-          header h1 { font-size: 14pt !important; }
-          header p { font-size: 7pt !important; margin: 0 !important; }
-          .region-header { background: #1e2d4a !important; padding: 3px 8px !important; }
-          .region-header span { font-size: 7pt !important; }
+          body { background: white !important; font-size: 6pt !important; }
+          header { background: #1e2d4a !important; padding: 4px 10px !important; }
+          header h1 { font-size: 11pt !important; margin: 0 !important; }
+          header p { font-size: 6pt !important; margin: 0 !important; }
+          .region-header { background: #1e2d4a !important; padding: 2px 6px !important; }
+          .region-header span { font-size: 6pt !important; }
           .pdf-drop-zone { display: none !important; }
-          main { padding: 4px 8px 4px !important; }
-          main > div { gap: 6px !important; }
-          .bg-white.rounded-lg { border-radius: 3px !important; box-shadow: none !important; }
-          li { padding: 1px 6px !important; min-height: 0 !important; }
-          li span.text-sm { font-size: 7pt !important; }
-          .status-box { width: 14px !important; height: 14px !important; font-size: 8pt !important; border-width: 1px !important; }
+          main { padding: 2px 6px 2px !important; }
+          main > div { gap: 4px !important; }
+          .bg-white.rounded-lg { border-radius: 2px !important; box-shadow: none !important; }
+          li { padding: 0px 4px !important; min-height: 0 !important; line-height: 1.1 !important; }
+          li span.text-sm { font-size: 6pt !important; }
+          .status-box { width: 10px !important; height: 10px !important; font-size: 6pt !important; border-width: 1px !important; flex-shrink: 0 !important; }
           .status-box.is-checked { border-color: #16a34a !important; background: #f0fdf4 !important; color: #16a34a !important; }
           .status-box.is-xed { border-color: #dc2626 !important; background: #fef2f2 !important; color: #dc2626 !important; }
-          .flex.items-center.px-3.py-1\\.5 { padding: 2px 6px !important; font-size: 6pt !important; }
-          .w-8 { width: 18px !important; }
+          .flex.items-center.px-3.py-1\\.5 { padding: 1px 4px !important; font-size: 5.5pt !important; }
+          .w-8 { width: 12px !important; }
           div[class*="legend"], div[class*="pt-3"] { display: none !important; }
+          input[type="text"] { display: none !important; }
+          li > div:first-child { padding: 1px 4px !important; }
+          li > div.px-3.pb-2 { display: none !important; }
+          .flex.items-center.px-3.py-2 { padding: 1px 4px !important; }
+          .flex.items-center.px-3.py-1\\.5.bg-gray-50 { padding: 1px 4px !important; font-size: 5.5pt !important; }
         }
         @keyframes modalIn {
           from { opacity: 0; transform: scale(0.96) translateY(10px); }
