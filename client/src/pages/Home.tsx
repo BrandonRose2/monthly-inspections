@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef, DragEvent } from "react";
+import { trpc } from "@/lib/trpc";
 import { Printer, RotateCcw, Mail, X as XIcon, Copy, Check, FileText, Upload, Eye, Trash2, ChevronLeft, ChevronRight, ClipboardList, GitCompare, Download, FolderOpen } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -28,9 +29,6 @@ interface PropertyStatus {
 }
 
 type InspectionState = Record<string, PropertyStatus>;
-
-// Key: "YYYY-MM" → InspectionState
-type AllMonthsData = Record<string, InspectionState>;
 
 // ─── Contact Data ─────────────────────────────────────────────────────────────
 
@@ -88,23 +86,10 @@ const REGIONS: { name: string; properties: string[] }[] = [
 ];
 
 const TOTAL = REGIONS.reduce((acc, r) => acc + r.properties.length, 0);
-const STORAGE_KEY = "monthly_inspections_all_v1";
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 
 function buildKey(region: string, property: string) { return `${region}::${property}`; }
 function monthKey(year: number, month: number) { return `${year}-${String(month + 1).padStart(2, "0")}`; }
-
-function loadAllData(): AllMonthsData {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch {}
-  return {};
-}
-
-function saveAllData(data: AllMonthsData) {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch {}
-}
 
 function formatBytes(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
@@ -148,21 +133,34 @@ function buildEmailDrafts(xedProperties: string[], monthLabel: string) {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export default function Home() {
-  // The userAuth hooks provides authentication state
-  // To implement login/logout functionality, simply call logout() or redirect to getLoginUrl()
-  // auth available if needed
+// Convert DB rows to InspectionState map
+function rowsToState(rows: { region: string; property: string; checked: boolean; xed: boolean; note?: string | null; pdfName?: string | null; pdfKey?: string | null; pdfSize?: number | null; pdfUploadedAt?: string | null }[]): InspectionState {
+  const state: InspectionState = {};
+  for (const row of rows) {
+    const key = buildKey(row.region, row.property);
+    state[key] = {
+      checked: row.checked,
+      xed: row.xed,
+      note: row.note ?? undefined,
+      pdf: row.pdfName ? { name: row.pdfName, dataUrl: row.pdfKey ?? "", size: row.pdfSize ?? 0, uploadedAt: row.pdfUploadedAt ?? "" } : null,
+    };
+  }
+  return state;
+}
 
+export default function Home() {
   const now = new Date();
   const [selectedYear, setSelectedYear]   = useState(now.getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth());
-  const [allData, setAllData]             = useState<AllMonthsData>(loadAllData);
   const [showEmailModal, setShowEmailModal]     = useState(false);
   const [showSummaryModal, setShowSummaryModal] = useState(false);
   const [showCompareModal, setShowCompareModal] = useState(false);
   const [copiedIdx, setCopiedIdx]         = useState<number | null>(null);
 
-  // Previous month data
+  // ── Cloud DB queries ──
+  const mk = monthKey(selectedYear, selectedMonth);
+  const monthLabel = `${MONTHS[selectedMonth]} ${selectedYear}`;
+
   const prevMk = (() => {
     const pm = selectedMonth === 0 ? 11 : selectedMonth - 1;
     const py = selectedMonth === 0 ? selectedYear - 1 : selectedYear;
@@ -173,39 +171,128 @@ export default function Home() {
     const py = selectedMonth === 0 ? selectedYear - 1 : selectedYear;
     return `${MONTHS[pm]} ${py}`;
   })();
-  const prevState: InspectionState = allData[prevMk] || {};
 
-  const mk = monthKey(selectedYear, selectedMonth);
-  const monthLabel = `${MONTHS[selectedMonth]} ${selectedYear}`;
-  const state: InspectionState = allData[mk] || {};
+  const { data: currentRows = [], refetch: refetchCurrent } = trpc.inspections.getMonth.useQuery({ monthKey: mk });
+  const { data: prevRows = [] } = trpc.inspections.getMonth.useQuery({ monthKey: prevMk });
+  const { data: savedMonthKeys = [], refetch: refetchMonths } = trpc.inspections.getSavedMonths.useQuery();
 
-  useEffect(() => { saveAllData(allData); }, [allData]);
+  const state: InspectionState = rowsToState(currentRows);
+  const prevState: InspectionState = rowsToState(prevRows);
 
-  const setState = useCallback((updater: (prev: InspectionState) => InspectionState) => {
-    setAllData((prev) => ({ ...prev, [mk]: updater(prev[mk] || {}) }));
-  }, [mk]);
+  // Local optimistic state overlay (for instant UI feedback before server confirms)
+  const [localOverlay, setLocalOverlay] = useState<InspectionState>({});
+  // Merge: server state + local overlay
+  const mergedState: InspectionState = { ...state };
+  for (const [k, v] of Object.entries(localOverlay)) {
+    mergedState[k] = { ...(state[k] || { checked: false, xed: false }), ...v };
+  }
+
+  // Clear overlay when server data refreshes
+  useEffect(() => { setLocalOverlay({}); }, [mk]);
+
+  const upsertMutation = trpc.inspections.upsertRecord.useMutation({
+    onSuccess: () => { refetchCurrent(); refetchMonths(); },
+  });
+  const uploadPdfMutation = trpc.inspections.uploadPdf.useMutation({
+    onSuccess: () => { refetchCurrent(); },
+  });
+
+  const getRegionForKey = (key: string) => {
+    const [region] = key.split("::");
+    return region;
+  };
+  const getPropForKey = (key: string) => {
+    const parts = key.split("::");
+    return parts.slice(1).join("::");
+  };
 
   const toggleStatus = useCallback((key: string, type: "checked" | "xed") => {
     playClick();
-    setState((prev) => {
-      const cur = prev[key] || { checked: false, xed: false };
-      return { ...prev, [key]: { ...cur, [type]: !cur[type] } };
+    const cur = mergedState[key] || { checked: false, xed: false };
+    const newVal = !cur[type];
+    // Optimistic update
+    setLocalOverlay((prev) => ({ ...prev, [key]: { ...cur, ...prev[key], [type]: newVal } }));
+    upsertMutation.mutate({
+      monthKey: mk,
+      region: getRegionForKey(key),
+      property: getPropForKey(key),
+      checked: type === "checked" ? newVal : (cur.checked ?? false),
+      xed: type === "xed" ? newVal : (cur.xed ?? false),
+      note: cur.note,
+      pdfName: cur.pdf?.name,
+      pdfKey: cur.pdf?.dataUrl,
+      pdfSize: cur.pdf?.size,
+      pdfUploadedAt: cur.pdf?.uploadedAt,
     });
-  }, [setState]);
+  }, [mergedState, mk, upsertMutation]);
 
   const attachPDF = useCallback((key: string, pdf: PDFAttachment | null) => {
-    setState((prev) => {
-      const cur = prev[key] || { checked: false, xed: false };
-      return { ...prev, [key]: { ...cur, pdf } };
-    });
-  }, [setState]);
+    const cur = mergedState[key] || { checked: false, xed: false };
+    if (pdf) {
+      // Upload to S3 via server
+      const base64 = pdf.dataUrl.split(",")[1] || pdf.dataUrl;
+      uploadPdfMutation.mutate({
+        monthKey: mk,
+        region: getRegionForKey(key),
+        property: getPropForKey(key),
+        fileName: pdf.name,
+        fileBase64: base64,
+        fileSize: pdf.size,
+      }, {
+        onSuccess: (result) => {
+          upsertMutation.mutate({
+            monthKey: mk,
+            region: getRegionForKey(key),
+            property: getPropForKey(key),
+            checked: cur.checked ?? false,
+            xed: cur.xed ?? false,
+            note: cur.note,
+            pdfName: pdf.name,
+            pdfKey: result.key,
+            pdfSize: pdf.size,
+            pdfUploadedAt: new Date().toLocaleString(),
+          });
+        }
+      });
+      // Optimistic local update
+      setLocalOverlay((prev) => ({ ...prev, [key]: { ...cur, ...prev[key], pdf } }));
+    } else {
+      setLocalOverlay((prev) => ({ ...prev, [key]: { ...cur, ...prev[key], pdf: null } }));
+      upsertMutation.mutate({
+        monthKey: mk,
+        region: getRegionForKey(key),
+        property: getPropForKey(key),
+        checked: cur.checked ?? false,
+        xed: cur.xed ?? false,
+        note: cur.note,
+        pdfName: undefined,
+        pdfKey: undefined,
+        pdfSize: undefined,
+        pdfUploadedAt: undefined,
+      });
+    }
+  }, [mergedState, mk, upsertMutation, uploadPdfMutation]);
 
   const addNote = useCallback((key: string, note: string) => {
-    setState((prev) => {
-      const cur = prev[key] || { checked: false, xed: false };
-      return { ...prev, [key]: { ...cur, note } };
-    });
-  }, [setState]);
+    const cur = mergedState[key] || { checked: false, xed: false };
+    setLocalOverlay((prev) => ({ ...prev, [key]: { ...cur, ...prev[key], note } }));
+    // Debounce note saves
+    const timer = setTimeout(() => {
+      upsertMutation.mutate({
+        monthKey: mk,
+        region: getRegionForKey(key),
+        property: getPropForKey(key),
+        checked: cur.checked ?? false,
+        xed: cur.xed ?? false,
+        note,
+        pdfName: cur.pdf?.name,
+        pdfKey: cur.pdf?.dataUrl,
+        pdfSize: cur.pdf?.size,
+        pdfUploadedAt: cur.pdf?.uploadedAt,
+      });
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [mergedState, mk, upsertMutation]);
 
   const prevMonth = () => {
     if (selectedMonth === 0) { setSelectedMonth(11); setSelectedYear(y => y - 1); }
@@ -217,12 +304,12 @@ export default function Home() {
   };
 
   const xedProperties = REGIONS.flatMap((r) =>
-    r.properties.filter((p) => state[buildKey(r.name, p)]?.xed)
+    r.properties.filter((p) => mergedState[buildKey(r.name, p)]?.xed)
   );
-  const checkedCount  = Object.values(state).filter((s) => s.checked).length;
+  const checkedCount  = Object.values(mergedState).filter((s) => s.checked).length;
   const xedCount      = xedProperties.length;
-  const reviewedCount = Object.values(state).filter((s) => s.checked || s.xed).length;
-  const pdfCount      = Object.values(state).filter((s) => s.pdf).length;
+  const reviewedCount = Object.values(mergedState).filter((s) => s.checked || s.xed).length;
+  const pdfCount      = Object.values(mergedState).filter((s) => s.pdf).length;
   const progressPct   = Math.round((reviewedCount / TOTAL) * 100);
   const emailDrafts   = buildEmailDrafts(xedProperties, monthLabel);
 
@@ -230,16 +317,23 @@ export default function Home() {
   const currentYear = now.getFullYear();
   const yearOptions = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
 
+  const resetMonthMutation = trpc.inspections.resetMonth.useMutation({
+    onSuccess: () => { refetchCurrent(); refetchMonths(); setLocalOverlay({}); },
+  });
+
   const handleReset = () => {
     if (window.confirm(`Reset all inspection marks for ${monthLabel}?`)) {
-      setAllData((prev) => { const next = { ...prev }; delete next[mk]; return next; });
+      resetMonthMutation.mutate({ monthKey: mk });
     }
   };
 
   const importRef = useRef<HTMLInputElement>(null);
 
   const handleExport = () => {
-    const json = JSON.stringify(allData, null, 2);
+    // Export current month's data as JSON backup
+    const exportData: Record<string, InspectionState> = {};
+    exportData[mk] = mergedState;
+    const json = JSON.stringify(exportData, null, 2);
     const blob = new Blob([json], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -253,12 +347,37 @@ export default function Home() {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (ev) => {
+    reader.onload = async (ev) => {
       try {
         const parsed = JSON.parse(ev.target?.result as string);
         if (typeof parsed === "object" && parsed !== null) {
-          setAllData((prev) => ({ ...prev, ...parsed }));
-          alert(`✅ Data imported successfully! ${Object.keys(parsed).length} month(s) restored.`);
+          let count = 0;
+          for (const [importMk, importState] of Object.entries(parsed as Record<string, InspectionState>)) {
+            for (const region of REGIONS) {
+              for (const property of region.properties) {
+                const key = buildKey(region.name, property);
+                const s = (importState as InspectionState)[key];
+                if (s && (s.checked || s.xed || s.note || s.pdf)) {
+                  await upsertMutation.mutateAsync({
+                    monthKey: importMk,
+                    region: region.name,
+                    property,
+                    checked: s.checked ?? false,
+                    xed: s.xed ?? false,
+                    note: s.note,
+                    pdfName: s.pdf?.name,
+                    pdfKey: s.pdf?.dataUrl,
+                    pdfSize: s.pdf?.size,
+                    pdfUploadedAt: s.pdf?.uploadedAt,
+                  });
+                  count++;
+                }
+              }
+            }
+          }
+          refetchCurrent();
+          refetchMonths();
+          alert(`✅ Imported ${count} property records from ${Object.keys(parsed).length} month(s) into the cloud database!`);
         } else {
           alert("Invalid backup file.");
         }
@@ -275,11 +394,10 @@ export default function Home() {
     window.open(`mailto:${d.to}?subject=${encodeURIComponent(d.subject)}&body=${encodeURIComponent(d.body)}`, "_blank");
   };
 
-  // Check if a month has any saved data
+  // Check if a month has any saved data (from cloud)
   const hasData = (y: number, m: number) => {
     const k = monthKey(y, m);
-    const d = allData[k];
-    return d && Object.keys(d).length > 0;
+    return savedMonthKeys.includes(k);
   };
 
   return (
@@ -441,7 +559,7 @@ export default function Home() {
       <main className="max-w-6xl mx-auto px-6 py-4 pb-12">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           {REGIONS.map((region) => (
-            <RegionBlock key={region.name} region={region} state={state} onToggle={toggleStatus} onAttachPDF={attachPDF} onNote={addNote} />
+            <RegionBlock key={region.name} region={region} state={mergedState} onToggle={toggleStatus} onAttachPDF={attachPDF} onNote={addNote} />
           ))}
         </div>
       </main>
@@ -449,7 +567,7 @@ export default function Home() {
       {/* ── Compare Modal ── */}
       {showCompareModal && (
         <CompareModal
-          currentState={state}
+          currentState={mergedState}
           prevState={prevState}
           currentLabel={monthLabel}
           prevLabel={prevMonthLabel}
@@ -463,7 +581,7 @@ export default function Home() {
           xedProperties={xedProperties}
           checkedCount={checkedCount}
           monthLabel={monthLabel}
-          state={state}
+          state={mergedState}
           onClose={() => setShowSummaryModal(false)}
         />
       )}

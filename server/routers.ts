@@ -3,7 +3,7 @@ import { z } from "zod";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
-import { getMonthRecords, getSavedMonthKeys, upsertInspectionRecord } from "./db";
+import { deleteMonthRecords, getMonthRecords, getSavedMonthKeys, upsertInspectionRecord } from "./db";
 import { storagePut } from "./storage";
 
 export const appRouter = router({
@@ -48,6 +48,13 @@ export const appRouter = router({
       )
       .mutation(async ({ input }) => {
         await upsertInspectionRecord(input);
+        return { success: true };
+      }),
+
+    resetMonth: publicProcedure
+      .input(z.object({ monthKey: z.string().regex(/^\d{4}-\d{2}$/) }))
+      .mutation(async ({ input }) => {
+        await deleteMonthRecords(input.monthKey);
         return { success: true };
       }),
 

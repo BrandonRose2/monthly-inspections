@@ -132,6 +132,12 @@ export async function upsertInspectionRecord(record: InsertInspectionRecord) {
   }
 }
 
+export async function deleteMonthRecords(monthKey: string): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(inspectionRecords).where(eq(inspectionRecords.monthKey, monthKey));
+}
+
 export async function getSavedMonthKeys(): Promise<string[]> {
   const db = await getDb();
   if (!db) return [];
