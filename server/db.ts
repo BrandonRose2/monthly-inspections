@@ -184,3 +184,80 @@ export async function getHistorySummary(): Promise<MonthSummary[]> {
   // Sort descending (newest first)
   return Array.from(map.values()).sort((a, b) => b.monthKey.localeCompare(a.monthKey));
 }
+
+export interface RepeatOffender {
+  property: string;
+  region: string;
+  consecutiveMonths: number;   // length of the current streak
+  totalFailedMonths: number;   // all-time months with xed=true
+  months: string[];            // all monthKeys where xed=true, sorted ascending
+  streak: string[];            // the current consecutive streak (most recent N months)
+}
+
+export async function getRepeatOffenders(minConsecutive = 2): Promise<RepeatOffender[]> {
+  const db = await getDb();
+  if (!db) return [];
+
+  // Fetch only xed=true rows
+  const rows = await db
+    .select()
+    .from(inspectionRecords)
+    .where(eq(inspectionRecords.xed, true));
+
+  // Group by property
+  const byPropObj: Record<string, { region: string; months: string[] }> = {};
+  for (const row of rows) {
+    const key = `${row.region}::${row.property}`;
+    if (!byPropObj[key]) byPropObj[key] = { region: row.region, months: [] };
+    if (!byPropObj[key].months.includes(row.monthKey)) {
+      byPropObj[key].months.push(row.monthKey);
+    }
+  }
+
+  const offenders: RepeatOffender[] = [];
+
+  for (const [key, { region, months }] of Object.entries(byPropObj)) {
+    const property = key.split("::").slice(1).join("::");
+    const sortedMonths: string[] = [...months].sort(); // ascending "YYYY-MM"
+
+    // Find the longest consecutive streak ending at the most recent month
+    // "Consecutive" means each month is exactly 1 calendar month after the previous
+    const isConsecutive = (a: string, b: string) => {
+      const [ay, am] = a.split("-").map(Number);
+      const [by, bm] = b.split("-").map(Number);
+      const aIdx = ay * 12 + am;
+      const bIdx = by * 12 + bm;
+      return bIdx - aIdx === 1;
+    };
+
+    // Walk backwards from the most recent month to find the current streak
+    let streak: string[] = [sortedMonths[sortedMonths.length - 1] as string];
+    for (let i = sortedMonths.length - 2; i >= 0; i--) {
+      if (isConsecutive(sortedMonths[i], streak[0])) {
+        streak.unshift(sortedMonths[i]);
+      } else {
+        break;
+      }
+    }
+
+    if (streak.length >= minConsecutive) {
+      offenders.push({
+        property,
+        region,
+        consecutiveMonths: streak.length,
+        totalFailedMonths: sortedMonths.length,
+        months: sortedMonths,
+        streak,
+      });
+    }
+  }
+
+  // Sort by streak length desc, then total desc
+  offenders.sort((a, b) =>
+    b.consecutiveMonths !== a.consecutiveMonths
+      ? b.consecutiveMonths - a.consecutiveMonths
+      : b.totalFailedMonths - a.totalFailedMonths
+  );
+
+  return offenders;
+}

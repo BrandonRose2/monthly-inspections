@@ -3,7 +3,7 @@ import { z } from "zod";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
-import { deleteAllRecords, deleteMonthRecords, getHistorySummary, getMonthRecords, getSavedMonthKeys, upsertInspectionRecord } from "./db";
+import { deleteAllRecords, deleteMonthRecords, getHistorySummary, getMonthRecords, getRepeatOffenders, getSavedMonthKeys, upsertInspectionRecord } from "./db";
 import { storagePut } from "./storage";
 
 export const appRouter = router({
@@ -29,6 +29,10 @@ export const appRouter = router({
 
     getHistory: publicProcedure.query(async () => {
       return getHistorySummary();
+    }),
+
+    getRepeatOffenders: publicProcedure.query(async () => {
+      return getRepeatOffenders(2);
     }),
 
     getSavedMonths: publicProcedure.query(async () => {

@@ -1241,6 +1241,7 @@ function HistoryModal({ onClose, onNavigate }: {
   onNavigate: (year: number, month: number) => void;
 }) {
   const { data: history = [], isLoading } = trpc.inspections.getHistory.useQuery();
+  const { data: repeatOffenders = [], isLoading: loadingOffenders } = trpc.inspections.getRepeatOffenders.useQuery();
 
   const formatMonthLabel = (mk: string) => {
     const [y, m] = mk.split("-");
@@ -1306,6 +1307,44 @@ function HistoryModal({ onClose, onNavigate }: {
             <div className="px-5 py-3 text-center">
               <div className="text-sm font-semibold text-[#1e2d4a] truncate">{bestMonth ? formatMonthLabel(bestMonth.monthKey) : "—"}</div>
               <div className="text-xs text-gray-500 mt-0.5">Best Month ({bestMonth?.passed ?? 0} passed)</div>
+            </div>
+          </div>
+        )}
+
+        {/* Repeat Offenders banner — shown when data is available */}
+        {!loadingOffenders && repeatOffenders.length > 0 && (
+          <div className="border-b border-red-200 bg-red-50 px-5 py-3 flex-shrink-0">
+            <div className="flex items-center gap-2 mb-2">
+              <XCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
+              <span className="text-sm font-bold text-red-700">Repeat Offenders</span>
+              <span className="text-xs text-red-500 bg-red-100 rounded-full px-2 py-0.5 font-semibold">{repeatOffenders.length} propert{repeatOffenders.length === 1 ? "y" : "ies"}</span>
+              <span className="text-xs text-red-400 ml-1">— marked ✗ in 2+ consecutive months</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {repeatOffenders.map((o) => (
+                <div
+                  key={`${o.region}::${o.property}`}
+                  className="flex items-center gap-2 bg-white border border-red-200 rounded-lg px-3 py-1.5 shadow-sm"
+                >
+                  <div>
+                    <div className="text-xs font-bold text-red-700 leading-tight">{o.property}</div>
+                    <div className="text-[10px] text-gray-400">{o.region}</div>
+                  </div>
+                  <div className="flex flex-col items-end gap-0.5 ml-1">
+                    <span className="text-xs font-bold text-red-600 bg-red-100 rounded px-1.5 py-0.5 leading-none">
+                      {o.consecutiveMonths} mo streak
+                    </span>
+                    <span className="text-[10px] text-gray-400">{o.totalFailedMonths} total</span>
+                  </div>
+                  <div className="flex gap-0.5 ml-1">
+                    {o.streak.map((mk) => (
+                      <span key={mk} className="text-[9px] bg-red-200 text-red-700 rounded px-1 py-0.5 font-medium">
+                        {mk.slice(5)}/{mk.slice(2, 4)}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}
