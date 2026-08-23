@@ -224,13 +224,48 @@ async function run() {
       }, ids);
 
       if (!selected) throw new Error(`no worker checkboxes matched ids ${ids.join(', ')}`);
-      await sleep(2500);
+      await sleep(1500);
+
+      // Changing filters does not reload the grid on its own — the refresh
+      // button must be clicked, and until events load the export control stays
+      // disabled. Verified against the live site.
+      await page.evaluate(() => {
+        const r = document.querySelector('button.refresh-btn');
+        if (r && !r.disabled) r.click();
+      });
+      await sleep(6000);
+
+      const state = await page.evaluate(() => {
+        const btn = [...document.querySelectorAll('button')]
+          .find(b => (b.textContent || '').includes('Export To'));
+        const text = document.body.innerText;
+        return {
+          exportDisabled: btn ? btn.disabled : true,
+          noRecords: /No records to display/i.test(text),
+          total: (text.match(/Total Events:\s*(\d+)/i) || [null, '0'])[1],
+        };
+      });
+
+      if (state.noRecords || state.total === '0') {
+        console.log(`     no events in ${range.label} — nothing to file`);
+        results.push({ mlwName, destinations, events: 0, skipped: true, ok: true });
+        continue;
+      }
+      console.log(`     ${state.total} events`);
+      if (state.exportDisabled) throw new Error('export control still disabled after refresh');
 
       const exportClicked = await clickByText(page, ['button', 'a', '[role="button"]'], ['Export To', 'Export to']);
       if (!exportClicked) throw new Error('Export control not found');
       await sleep(800);
 
-      const pdfClicked = await clickByText(page, ['li', 'a', '[role="menuitem"]', '.dropdown-item'], ['Export to PDF', 'PDF']);
+      // The menu renders as button.mat-menu-item — not li/a/[role=menuitem],
+      // which is why the recovered draft could never have found it. Match the
+      // exact label rather than any text containing "PDF".
+      const pdfClicked = await clickByText(
+        page,
+        ['button.mat-menu-item', '.mat-menu-item', 'button', 'li', '[role="menuitem"]'],
+        ['Export to PDF']
+      );
       if (!pdfClicked) throw new Error('"Export to PDF" menu item not found');
 
       // Wait for a new PDF to land in the download directory.
