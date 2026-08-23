@@ -44,8 +44,9 @@ the row shown in the UI.
 
 Two MyLoneWorkers reports cover two portal properties each
 (`Howell Place - Pirates Bend`, `North Pointe - Bayou Pointe`); the same PDF is
-filed against both. Four portal properties have no MyLoneWorkers source at all
-(Anaheim Gardens, Fairfax, Urban, Wilmington).
+filed against both. `NWA` is the MyLoneWorkers name for the portal's
+`Wilmington`. Three portal properties have no MyLoneWorkers source at all
+(Anaheim Gardens, Fairfax, Urban).
 
 ## Selector status
 

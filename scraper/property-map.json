@@ -10,54 +10,168 @@
     "properties, and the same PDF is filed against each."
   ],
   "confirmed": {
-    "Arbor Crest":            { "region": "Region 1", "property": "Arbor Crest" },
-    "Boca Ciega":             { "region": "Region 1", "property": "Boca Ciega" },
-    "Coral Village":          { "region": "Region 1", "property": "Coral Village" },
-    "Macedonia":              { "region": "Region 1", "property": "Macedonia" },
-    "Opa Locka Apts":         { "region": "Region 1", "property": "Opa Locka" },
-    "Breckenridge":           { "region": "Region 2", "property": "Breckenridge" },
-    "Crossroads":             { "region": "Region 2", "property": "Crossroads" },
-    "Cumberland Apts":        { "region": "Region 2", "property": "Cumberland" },
-    "Grace Townhomes":        { "region": "Region 2", "property": "Grace Townhomes" },
-    "Holiday Apts":           { "region": "Region 2", "property": "Holiday" },
-    "La Promesa":             { "region": "Region 2", "property": "La Promesa" },
-    "Lexington":              { "region": "Region 2", "property": "Lexington" },
-    "Walnut Hill":            { "region": "Region 2", "property": "Walnut Hill" },
-    "Pelican Bay":            { "region": "Region 3", "property": "Pelican Bay" },
-    "Ruby Diamond":           { "region": "Region 3", "property": "Ruby Diamond" },
-    "Thibodaux":              { "region": "Region 3", "property": "Thibodaux" },
-    "Forest View Apts":       { "region": "Region 4", "property": "Forest View" },
-    "Granite Ridge":          { "region": "Region 4", "property": "Granite Ridge" },
-    "Oak Hills":              { "region": "Region 4", "property": "Oak Hills" },
-
-    "Jefferson Arms Apts":    { "region": "Region 1", "property": "Jefferson" },
-    "River Point Apts":       { "region": "Region 1", "property": "River Pointe" },
-    "Silver Springs Terrace": { "region": "Region 1", "property": "Silver Springs" },
-    "ThomasVille Church":     { "region": "Region 1", "property": "Thomasville" },
-    "Grove Park Terrace":     { "region": "Region 2", "property": "Grove Park" },
-    "Gates On Manhattan":     { "region": "Region 3", "property": "Gates of Manhattan" },
-    "Marrero 3":              { "region": "Region 3", "property": "Marrero" },
-    "St Charles Place":       { "region": "Region 3", "property": "St. Charles" },
-    "Star Homes":             { "region": "Region 3", "property": "Star" },
-    "Yorkshire Windsor":      { "region": "Region 3", "property": "Windsor / Yorkshire" },
-    "Midtown Manor":          { "region": "Region 4", "property": "Midtown" },
-    "River Gardens":          { "region": "Region 4", "property": "River Garden" },
-    "Pacific Pointe":         { "region": "Region 4", "property": "Pacific" },
-
-    "Columbia Village":       { "region": "Region 4", "property": "Columbia" }
+    "Arbor Crest": {
+      "region": "Region 1",
+      "property": "Arbor Crest"
+    },
+    "Boca Ciega": {
+      "region": "Region 1",
+      "property": "Boca Ciega"
+    },
+    "Coral Village": {
+      "region": "Region 1",
+      "property": "Coral Village"
+    },
+    "Macedonia": {
+      "region": "Region 1",
+      "property": "Macedonia"
+    },
+    "Opa Locka Apts": {
+      "region": "Region 1",
+      "property": "Opa Locka"
+    },
+    "Breckenridge": {
+      "region": "Region 2",
+      "property": "Breckenridge"
+    },
+    "Crossroads": {
+      "region": "Region 2",
+      "property": "Crossroads"
+    },
+    "Cumberland Apts": {
+      "region": "Region 2",
+      "property": "Cumberland"
+    },
+    "Grace Townhomes": {
+      "region": "Region 2",
+      "property": "Grace Townhomes"
+    },
+    "Holiday Apts": {
+      "region": "Region 2",
+      "property": "Holiday"
+    },
+    "La Promesa": {
+      "region": "Region 2",
+      "property": "La Promesa"
+    },
+    "Lexington": {
+      "region": "Region 2",
+      "property": "Lexington"
+    },
+    "Walnut Hill": {
+      "region": "Region 2",
+      "property": "Walnut Hill"
+    },
+    "Pelican Bay": {
+      "region": "Region 3",
+      "property": "Pelican Bay"
+    },
+    "Ruby Diamond": {
+      "region": "Region 3",
+      "property": "Ruby Diamond"
+    },
+    "Thibodaux": {
+      "region": "Region 3",
+      "property": "Thibodaux"
+    },
+    "Forest View Apts": {
+      "region": "Region 4",
+      "property": "Forest View"
+    },
+    "Granite Ridge": {
+      "region": "Region 4",
+      "property": "Granite Ridge"
+    },
+    "Oak Hills": {
+      "region": "Region 4",
+      "property": "Oak Hills"
+    },
+    "Jefferson Arms Apts": {
+      "region": "Region 1",
+      "property": "Jefferson"
+    },
+    "River Point Apts": {
+      "region": "Region 1",
+      "property": "River Pointe"
+    },
+    "Silver Springs Terrace": {
+      "region": "Region 1",
+      "property": "Silver Springs"
+    },
+    "ThomasVille Church": {
+      "region": "Region 1",
+      "property": "Thomasville"
+    },
+    "Grove Park Terrace": {
+      "region": "Region 2",
+      "property": "Grove Park"
+    },
+    "Gates On Manhattan": {
+      "region": "Region 3",
+      "property": "Gates of Manhattan"
+    },
+    "Marrero 3": {
+      "region": "Region 3",
+      "property": "Marrero"
+    },
+    "St Charles Place": {
+      "region": "Region 3",
+      "property": "St. Charles"
+    },
+    "Star Homes": {
+      "region": "Region 3",
+      "property": "Star"
+    },
+    "Yorkshire Windsor": {
+      "region": "Region 3",
+      "property": "Windsor / Yorkshire"
+    },
+    "Midtown Manor": {
+      "region": "Region 4",
+      "property": "Midtown"
+    },
+    "River Gardens": {
+      "region": "Region 4",
+      "property": "River Garden"
+    },
+    "Pacific Pointe": {
+      "region": "Region 4",
+      "property": "Pacific"
+    },
+    "Columbia Village": {
+      "region": "Region 4",
+      "property": "Columbia"
+    },
+    "NWA": {
+      "region": "Region 4",
+      "property": "Wilmington"
+    }
   },
   "needs_confirmation": {
     "Howell Place - Pirates Bend": [
-      { "region": "Region 3", "property": "Howell Place" },
-      { "region": "Region 3", "property": "Pirates Bend" }
+      {
+        "region": "Region 3",
+        "property": "Howell Place"
+      },
+      {
+        "region": "Region 3",
+        "property": "Pirates Bend"
+      }
     ],
     "North Pointe - Bayou Pointe": [
-      { "region": "Region 3", "property": "North Pointe" },
-      { "region": "Region 3", "property": "Bayou Pointe" }
-    ],
-    "NWA": null
+      {
+        "region": "Region 3",
+        "property": "North Pointe"
+      },
+      {
+        "region": "Region 3",
+        "property": "Bayou Pointe"
+      }
+    ]
   },
   "portal_properties_with_no_myloneworkers_source": [
-    "Anaheim Gardens", "Fairfax", "Urban", "Wilmington"
+    "Anaheim Gardens",
+    "Fairfax",
+    "Urban"
   ]
 }
