@@ -1,0 +1,14 @@
+{
+  "name": "monthly-inspections-scraper",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Downloads monthly inspection PDFs from MyLoneWorkers and files them into the inspections portal",
+  "type": "commonjs",
+  "scripts": {
+    "setup:session": "node setup-session.js",
+    "scrape": "node scrape-inspections.js"
+  },
+  "dependencies": {
+    "puppeteer": "^23.0.0"
+  }
+}

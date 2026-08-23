@@ -2,7 +2,7 @@ import { COOKIE_NAME } from "@shared/const";
 import { z } from "zod";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
-import { publicProcedure, router } from "./_core/trpc";
+import { machineProcedure, publicProcedure, router } from "./_core/trpc";
 import { deleteAllRecords, deleteMonthRecords, getHistorySummary, getMonthRecords, getRepeatOffenders, getSavedMonthKeys, upsertInspectionRecord } from "./db";
 import { storagePut } from "./storage";
 
@@ -70,6 +70,45 @@ export const appRouter = router({
       .mutation(async () => {
         await deleteAllRecords();
         return { success: true };
+      }),
+
+    // Automated ingest for the inspections scraper: stores the PDF and attaches
+    // it to the property's record for that month in a single authenticated call.
+    // Requires a bearer token (INGEST_TOKEN), unlike the UI's public procedures.
+    ingestInspectionPdf: machineProcedure
+      .input(
+        z.object({
+          monthKey: z.string().regex(/^\d{4}-\d{2}$/),
+          region: z.string(),
+          property: z.string(),
+          fileName: z.string(),
+          fileBase64: z.string(),
+          fileSize: z.number(),
+          checked: z.boolean().default(true),
+          note: z.string().optional(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const buffer = Buffer.from(input.fileBase64, "base64");
+        const safeProperty = input.property.replace(/[^a-zA-Z0-9]/g, "_");
+        const safeFileName = input.fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
+        const key = `inspections/${input.monthKey}/${safeProperty}/${Date.now()}_${safeFileName}`;
+        const { url } = await storagePut(key, buffer, "application/pdf");
+
+        await upsertInspectionRecord({
+          monthKey: input.monthKey,
+          region: input.region,
+          property: input.property,
+          checked: input.checked,
+          xed: false,
+          note: input.note ?? null,
+          pdfName: input.fileName,
+          pdfKey: url,
+          pdfSize: input.fileSize,
+          pdfUploadedAt: new Date().toISOString(),
+        });
+
+        return { success: true, url };
       }),
 
     uploadPdf: publicProcedure

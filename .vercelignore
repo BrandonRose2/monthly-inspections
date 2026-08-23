@@ -1,0 +1,3 @@
+# The scraper runs on a self-hosted GitHub Actions runner, not on Vercel.
+# Excluding it keeps puppeteer (and its bundled Chromium) out of the build.
+scraper/

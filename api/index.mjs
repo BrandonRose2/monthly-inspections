@@ -163,6 +163,25 @@ var adminProcedure = t.procedure.use(
     });
   })
 );
+var machineProcedure = t.procedure.use(
+  t.middleware(async (opts) => {
+    const { ctx, next } = opts;
+    const expected = process.env.INGEST_TOKEN;
+    if (!expected) {
+      throw new TRPCError2({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "INGEST_TOKEN is not configured on the server"
+      });
+    }
+    const header = ctx.req.headers.authorization ?? "";
+    const presented = header.startsWith("Bearer ") ? header.slice(7) : "";
+    const ok = presented.length === expected.length && presented.split("").reduce((acc, ch, i) => acc | ch.charCodeAt(0) ^ expected.charCodeAt(i), 0) === 0;
+    if (!ok) {
+      throw new TRPCError2({ code: "UNAUTHORIZED", message: "Invalid ingest token" });
+    }
+    return next({ ctx });
+  })
+);
 
 // server/_core/systemRouter.ts
 var systemRouter = router({
@@ -488,6 +507,40 @@ var appRouter = router({
     resetAllData: publicProcedure.mutation(async () => {
       await deleteAllRecords();
       return { success: true };
+    }),
+    // Automated ingest for the inspections scraper: stores the PDF and attaches
+    // it to the property's record for that month in a single authenticated call.
+    // Requires a bearer token (INGEST_TOKEN), unlike the UI's public procedures.
+    ingestInspectionPdf: machineProcedure.input(
+      z2.object({
+        monthKey: z2.string().regex(/^\d{4}-\d{2}$/),
+        region: z2.string(),
+        property: z2.string(),
+        fileName: z2.string(),
+        fileBase64: z2.string(),
+        fileSize: z2.number(),
+        checked: z2.boolean().default(true),
+        note: z2.string().optional()
+      })
+    ).mutation(async ({ input }) => {
+      const buffer = Buffer.from(input.fileBase64, "base64");
+      const safeProperty = input.property.replace(/[^a-zA-Z0-9]/g, "_");
+      const safeFileName = input.fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
+      const key = `inspections/${input.monthKey}/${safeProperty}/${Date.now()}_${safeFileName}`;
+      const { url } = await storagePut(key, buffer, "application/pdf");
+      await upsertInspectionRecord({
+        monthKey: input.monthKey,
+        region: input.region,
+        property: input.property,
+        checked: input.checked,
+        xed: false,
+        note: input.note ?? null,
+        pdfName: input.fileName,
+        pdfKey: url,
+        pdfSize: input.fileSize,
+        pdfUploadedAt: (/* @__PURE__ */ new Date()).toISOString()
+      });
+      return { success: true, url };
     }),
     uploadPdf: publicProcedure.input(
       z2.object({

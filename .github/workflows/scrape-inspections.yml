@@ -1,0 +1,51 @@
+name: Scrape monthly inspections
+
+# Runs on the self-hosted Mac runner because the scrape needs a real browser
+# with a persistent MyLoneWorkers session. A GitHub-hosted runner would have no
+# saved session and would come from a datacenter IP.
+on:
+  schedule:
+    # 09:00 America/Chicago on the 22nd — after the 1st-to-21st window closes.
+    - cron: '0 14 22 * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Scrape without filing anything into the portal'
+        type: boolean
+        default: false
+
+concurrency:
+  group: scrape-inspections
+  cancel-in-progress: false
+
+jobs:
+  scrape:
+    runs-on: [self-hosted, macOS]
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install scraper dependencies
+        working-directory: scraper
+        run: npm install --no-audit --no-fund
+
+      - name: Scrape and file inspection PDFs
+        working-directory: scraper
+        env:
+          PORTAL_BASE_URL: ${{ vars.PORTAL_BASE_URL }}
+          INGEST_TOKEN: ${{ secrets.INGEST_TOKEN }}
+          MLW_PROFILE_DIR: ${{ runner.temp }}/../.mlw-runner/browser-profile
+          HEADLESS: 'true'
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: npm run scrape
+
+      - name: Upload diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scrape-diagnostics
+          path: |
+            scraper/diagnostics/
+            scraper/output/results.json
+          retention-days: 14
+          if-no-files-found: ignore
