@@ -34,7 +34,6 @@ jobs:
         env:
           PORTAL_BASE_URL: ${{ vars.PORTAL_BASE_URL }}
           INGEST_TOKEN: ${{ secrets.INGEST_TOKEN }}
-          MLW_PROFILE_DIR: ${{ runner.temp }}/../.mlw-runner/browser-profile
           HEADLESS: 'true'
           DRY_RUN: ${{ inputs.dry_run }}
         run: npm run scrape
