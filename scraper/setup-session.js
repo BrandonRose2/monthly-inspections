@@ -29,21 +29,40 @@ const PROFILE_DIR = process.env.MLW_PROFILE_DIR || path.join(require('os').homed
   await page.goto(URL, { waitUntil: 'networkidle2', timeout: 60000 });
 
   console.log('\nSign in in the browser window that just opened.');
-  console.log('Waiting for the password field to disappear (up to 5 minutes)...\n');
+  console.log('Waiting for a signed-in session (up to 5 minutes)...\n');
+
+  // Wait for a POSITIVE signal, not merely the absence of a password field.
+  // MyLoneWorkers is an Angular app: right after navigation the login form has
+  // not hydrated yet, so "no password input" is briefly true even when signed
+  // out — which previously reported a false success.
+  const signedIn = async () => {
+    const url = page.url();
+    if (/\/login/i.test(url)) return false;
+    const hasPassword = await page.$('input[type="password"]').catch(() => null);
+    return !hasPassword;
+  };
 
   const deadline = Date.now() + 5 * 60 * 1000;
-  let signedIn = false;
+  let ok = false;
   while (Date.now() < deadline) {
     await new Promise(r => setTimeout(r, 3000));
-    const hasPassword = await page.$('input[type="password"]').catch(() => null);
-    if (!hasPassword) { signedIn = true; break; }
+    if (await signedIn()) { ok = true; break; }
   }
 
-  if (signedIn) {
-    console.log('Signed in. Session saved to the profile directory.');
-    console.log('You can close the browser window; scrape runs will reuse this session.');
+  if (ok) {
+    // Confirm by reloading the target page and checking we are not bounced
+    // back to the login route.
+    await page.goto(URL, { waitUntil: 'networkidle2', timeout: 60000 }).catch(() => {});
+    await new Promise(r => setTimeout(r, 2000));
+    if (/\/login/i.test(page.url())) {
+      console.error(`Still redirected to ${page.url()} — session did not stick.`);
+      process.exitCode = 1;
+    } else {
+      console.log(`Signed in and verified at ${page.url()}`);
+      console.log('Session saved. Scrape runs will reuse it.');
+    }
   } else {
-    console.error('Timed out waiting for sign-in. Nothing was saved as verified.');
+    console.error('Timed out waiting for sign-in. Nothing verified.');
     process.exitCode = 1;
   }
 

@@ -154,11 +154,42 @@ async function run() {
 
   // The persistent profile should already be signed in. Never type a password
   // here: if the session is gone, stop and ask for an interactive setup run.
-  if (await page.$('input[type="password"]').catch(() => null)) {
+  // Check the URL as well as the form — the app is Angular, so immediately
+  // after navigation the login form has not hydrated and testing only for a
+  // password input reports a false "signed in".
+  await sleep(2000);
+  const onLoginPage = /\/login/i.test(page.url());
+  const hasPasswordField = !!(await page.$('input[type="password"]').catch(() => null));
+  if (onLoginPage || hasPasswordField) {
     await saveDiagnostics(page, 'session-expired');
     await browser.close();
-    throw new Error('Not signed in. Run `npm run setup:session` on the runner to re-establish the session.');
+    throw new Error(`Not signed in (url: ${page.url()}). Run \`npm run setup:session\` on the runner to re-establish the session.`);
   }
+
+  // Set the reporting window. The pickers are Syncfusion datetimepickers with
+  // stable ids and a "YYYY-MM-DD HH:mm:ss" display format; they default to
+  // today, so without this the export would only cover the current day.
+  async function setDateRange() {
+    for (const [sel, value] of [['#fromDatePicker_input', range.start],
+                                ['#toDatePicker_input', range.end]]) {
+      const el = await page.$(sel);
+      if (!el) throw new Error(`date input ${sel} not found`);
+      await el.click({ clickCount: 3 });   // select the existing text
+      await el.type(value, { delay: 15 });
+      await page.keyboard.press('Enter');
+      await sleep(400);
+    }
+    const applied = await page.evaluate(() => ({
+      from: document.querySelector('#fromDatePicker_input')?.value || '',
+      to: document.querySelector('#toDatePicker_input')?.value || '',
+    }));
+    console.log(`Date range applied: ${applied.from} -> ${applied.to}`);
+    if (!applied.from.startsWith(range.label) || !applied.to.startsWith(range.label)) {
+      throw new Error(`date range did not take (got ${applied.from} -> ${applied.to})`);
+    }
+  }
+
+  await setDateRange();
 
   const results = [];
   let filed = 0, failed = 0;
@@ -172,16 +203,22 @@ async function run() {
       const before = new Set(fs.readdirSync(CONFIG.downloadDir));
 
       // Select this property's workers, then export the visible events to PDF.
+      //
+      // The guard list is a Syncfusion grid: each tr.e-row holds the worker ID
+      // in its first cell and the checkbox (input.e-checkselect) in the second.
+      // The checkbox's own container carries no text, so matching the ID has to
+      // walk the row's cells rather than the checkbox's ancestors.
       const ids = workerIds[mlwName];
       const selected = await page.evaluate((wanted) => {
-        const boxes = [...document.querySelectorAll('input[type="checkbox"]')];
+        const rows = [...document.querySelectorAll('tr.e-row')];
         let hits = 0;
-        for (const cb of boxes) {
-          const container = cb.closest('div, li, label');
-          const text = container ? container.textContent : '';
-          const match = wanted.some(id => text.includes(id));
-          if (match !== cb.checked) cb.click();
-          if (match) hits++;
+        for (const tr of rows) {
+          const cb = tr.querySelector('input.e-checkselect');
+          if (!cb) continue;
+          const rowId = (tr.querySelector('td')?.textContent || '').trim();
+          const want = wanted.includes(rowId);
+          if (want !== cb.checked) cb.click();
+          if (want) hits++;
         }
         return hits;
       }, ids);
