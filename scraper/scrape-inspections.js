@@ -78,18 +78,35 @@ async function saveDiagnostics(page, label) {
   }
 }
 
-// Click an element by its visible text. Replaces the draft's invalid
-// `button:contains(...)` / `button:has-text(...)` selectors, which Puppeteer
-// rejects outright as malformed CSS.
+// Click an element by its visible text using real CDP input events.
+//
+// An in-page element.click() is not a trusted user gesture, so Chrome treats
+// the resulting download as an "automatic download" and blocks every one after
+// the first. That produced exactly one successful export per run. Driving the
+// click through Puppeteer's input domain makes it a genuine user gesture.
 async function clickByText(page, selectors, texts) {
-  return page.evaluate((sel, wanted) => {
-    const nodes = document.querySelectorAll(sel);
-    for (const n of nodes) {
-      const t = (n.textContent || '').trim();
-      if (wanted.some(w => t.includes(w))) { n.click(); return t; }
+  for (const sel of selectors) {
+    for (const handle of await page.$$(sel)) {
+      const label = await handle
+        .evaluate(el => (el.textContent || '').trim().replace(/\s+/g, ' '))
+        .catch(() => '');
+      if (!label || !texts.some(t => label.includes(t))) continue;
+      const usable = await handle
+        .evaluate(el => !el.disabled && !!(el.offsetParent || el.getClientRects().length))
+        .catch(() => false);
+      if (!usable) continue;
+      try {
+        await handle.click();          // trusted input, unlike el.click()
+        return label;
+      } catch {
+        // Obscured or detached — fall back to an in-page click so a blocked
+        // menu item does not abort the whole property.
+        await handle.evaluate(el => el.click()).catch(() => {});
+        return label;
+      }
     }
-    return null;
-  }, selectors.join(','), texts);
+  }
+  return null;
 }
 
 async function fileToPortal({ monthKey, region, property, fileName, buffer }) {
@@ -148,7 +165,14 @@ async function run() {
   const page = (await browser.pages())[0] || (await browser.newPage());
 
   const cdp = await page.target().createCDPSession();
-  await cdp.send('Page.setDownloadBehavior', { behavior: 'allow', downloadPath: CONFIG.downloadDir });
+  // Browser-level first (survives navigations), then page-level as a fallback
+  // for older Chrome builds that only implement the page domain.
+  await cdp.send('Browser.setDownloadBehavior', {
+    behavior: 'allow', downloadPath: CONFIG.downloadDir, eventsEnabled: true,
+  }).catch(() => {});
+  await cdp.send('Page.setDownloadBehavior', {
+    behavior: 'allow', downloadPath: CONFIG.downloadDir,
+  }).catch(() => {});
 
   await page.goto(CONFIG.url, { waitUntil: 'networkidle2', timeout: 60000 });
 
@@ -200,7 +224,14 @@ async function run() {
     console.log(`\n- ${mlwName} -> ${destinations.map(d => d.property).join(' + ')}`);
 
     try {
-      const before = new Set(fs.readdirSync(CONFIG.downloadDir));
+      // Every export downloads under the same date-range filename
+      // ("Events report_01_08_2026_21_08_2026.pdf"), so a later download
+      // overwrites the earlier one instead of appearing as a new name.
+      // Comparing against a snapshot of filenames therefore missed every
+      // export after the first. Clear the directory and wait for any PDF.
+      for (const f of fs.readdirSync(CONFIG.downloadDir)) {
+        fs.unlinkSync(path.join(CONFIG.downloadDir, f));
+      }
 
       // Select this property's workers, then export the visible events to PDF.
       //
@@ -254,6 +285,10 @@ async function run() {
       console.log(`     ${state.total} events`);
       if (state.exportDisabled) throw new Error('export control still disabled after refresh');
 
+      await cdp.send('Browser.setDownloadBehavior', {
+        behavior: 'allow', downloadPath: CONFIG.downloadDir, eventsEnabled: true,
+      }).catch(() => {});
+
       const exportClicked = await clickByText(page, ['button', 'a', '[role="button"]'], ['Export To', 'Export to']);
       if (!exportClicked) throw new Error('Export control not found');
       await sleep(800);
@@ -268,14 +303,18 @@ async function run() {
       );
       if (!pdfClicked) throw new Error('"Export to PDF" menu item not found');
 
-      // Wait for a new PDF to land in the download directory.
-      let newFile = null;
-      for (let i = 0; i < 30 && !newFile; i++) {
+      // Wait for a completed PDF: present, no .crdownload partial alongside it,
+      // and a stable size across two polls.
+      let newFile = null, lastSize = -1;
+      for (let i = 0; i < 40; i++) {
         await sleep(1000);
-        newFile = fs.readdirSync(CONFIG.downloadDir)
-          .filter(f => f.endsWith('.pdf') && !before.has(f))
-          .sort((a, b) => fs.statSync(path.join(CONFIG.downloadDir, b)).mtimeMs
-                        - fs.statSync(path.join(CONFIG.downloadDir, a)).mtimeMs)[0] || null;
+        const files = fs.readdirSync(CONFIG.downloadDir);
+        if (files.some(f => f.endsWith('.crdownload'))) continue;
+        const pdf = files.find(f => f.toLowerCase().endsWith('.pdf'));
+        if (!pdf) continue;
+        const size = fs.statSync(path.join(CONFIG.downloadDir, pdf)).size;
+        if (size > 0 && size === lastSize) { newFile = pdf; break; }
+        lastSize = size;
       }
       if (!newFile) throw new Error('no PDF appeared in the download directory');
 
