@@ -89,7 +89,9 @@ export const appRouter = router({
         const safeFileName = input.fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
         const key = `inspections/${input.monthKey}/${safeProperty}/${Date.now()}_${safeFileName}`;
         const { url } = await storagePut(key, buffer, "application/pdf");
-        return { key, url };
+        // Return the stored object's URL as the key: the client persists this
+        // into pdfKey and uses it directly as the download link.
+        return { key: url, url };
       }),
 
     // Import a full backup JSON — uploads PDFs to S3 and saves all records to DB

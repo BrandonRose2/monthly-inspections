@@ -1,0 +1,23 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "vite build && esbuild server/vercel-entry.ts --bundle --platform=node --format=esm --packages=external --outfile=api/index.mjs",
+  "outputDirectory": "dist/public",
+  "rewrites": [
+    {
+      "source": "/api/trpc/:path*",
+      "destination": "/api"
+    },
+    {
+      "source": "/api/oauth/:path*",
+      "destination": "/api"
+    },
+    {
+      "source": "/manus-storage/:path*",
+      "destination": "/api"
+    },
+    {
+      "source": "/((?!api/|manus-storage/|assets/).*)",
+      "destination": "/index.html"
+    }
+  ]
+}
