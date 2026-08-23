@@ -27,7 +27,11 @@ jobs:
 
       - name: Install scraper dependencies
         working-directory: scraper
-        run: npm install --no-audit --no-fund
+        # Your npm blocks postinstall scripts (allow-scripts), which is what
+        # normally fetches Puppeteer's browser, so install it explicitly.
+        run: |
+          npm install --no-audit --no-fund
+          npx puppeteer browsers install chrome
 
       - name: Scrape and file inspection PDFs
         working-directory: scraper

@@ -16,6 +16,8 @@ profile directory on the runner:
 ```sh
 cd scraper
 npm install
+npx puppeteer browsers install chrome   # npm's allow-scripts blocks Puppeteer's
+                                        # postinstall, which normally does this
 npm run setup:session
 ```
 
