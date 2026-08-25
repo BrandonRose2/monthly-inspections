@@ -33,11 +33,22 @@ const CONFIG = {
   dryRun: process.env.DRY_RUN === 'true',
 };
 
-// Date range: 1st → 21st of the current month, matching the original tool.
+// Date range: 1st → 21st of the target month, matching the original tool.
+// MONTH ("YYYY-MM") overrides the default of the current month, so past
+// months can be back-filled.
 function getDateRange() {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const override = (process.env.MONTH || '').trim();
+  let y, m;
+  if (override) {
+    if (!/^\d{4}-\d{2}$/.test(override)) {
+      throw new Error(`MONTH must look like YYYY-MM, got "${override}"`);
+    }
+    [y, m] = override.split('-');
+  } else {
+    const now = new Date();
+    y = String(now.getFullYear());
+    m = String(now.getMonth() + 1).padStart(2, '0');
+  }
   return { start: `${y}-${m}-01 00:00:00`, end: `${y}-${m}-21 23:59:59`, label: `${y}-${m}` };
 }
 

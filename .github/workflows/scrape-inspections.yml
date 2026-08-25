@@ -13,6 +13,10 @@ on:
         description: 'Scrape without filing anything into the portal'
         type: boolean
         default: false
+      month:
+        description: 'Month to scrape as YYYY-MM (blank = current month)'
+        type: string
+        required: false
 
 concurrency:
   group: scrape-inspections
@@ -40,6 +44,7 @@ jobs:
           INGEST_TOKEN: ${{ secrets.INGEST_TOKEN }}
           HEADLESS: 'true'
           DRY_RUN: ${{ inputs.dry_run }}
+          MONTH: ${{ inputs.month }}
         run: npm run scrape
 
       - name: Upload diagnostics on failure
