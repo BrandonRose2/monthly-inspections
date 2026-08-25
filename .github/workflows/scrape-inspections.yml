@@ -19,7 +19,10 @@ on:
         required: false
 
 concurrency:
-  group: scrape-inspections
+  # Keyed by month so back-filling several months can queue independently.
+  # A single shared group only holds one pending run, so each new dispatch
+  # cancelled the previous one instead of queueing behind it.
+  group: scrape-inspections-${{ inputs.month || 'current' }}
   cancel-in-progress: false
 
 jobs:
