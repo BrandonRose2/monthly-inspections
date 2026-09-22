@@ -40,7 +40,11 @@ jobs:
           npm install --no-audit --no-fund
           npx puppeteer browsers install chrome
 
-      - name: Scrape and file inspection PDFs
+      - name: Test attribution rules
+        working-directory: scraper
+        run: npm test
+
+      - name: Pull MyLoneWorkers activity and file results
         working-directory: scraper
         env:
           PORTAL_BASE_URL: ${{ vars.PORTAL_BASE_URL }}
@@ -48,15 +52,25 @@ jobs:
           HEADLESS: 'true'
           DRY_RUN: ${{ inputs.dry_run }}
           MONTH: ${{ inputs.month }}
+          MIN_UNITS: ${{ vars.MIN_UNITS || '3' }}
         run: npm run scrape
+
+      - name: Keep this run's results and PDF reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: inspection-results-${{ inputs.month || 'current' }}-${{ github.run_number }}
+          path: |
+            scraper/output/results.json
+            scraper/output/pdfs/
+          retention-days: 90
+          if-no-files-found: ignore
 
       - name: Upload diagnostics on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: scrape-diagnostics
-          path: |
-            scraper/diagnostics/
-            scraper/output/results.json
+          path: scraper/diagnostics/
           retention-days: 14
           if-no-files-found: ignore

@@ -1,0 +1,10 @@
+{
+  "_comment": "Mirror of REGIONS in client/src/pages/Home.tsx. test/portal-properties.test.js fails if the two drift apart.",
+  "regions": {
+    "Region 1": ["Arbor Crest", "Boca Ciega", "Coral Village", "Jefferson", "Macedonia", "Opa Locka", "River Pointe", "Silver Springs", "Thomasville"],
+    "Region 2": ["Breckenridge", "Crossroads", "Cumberland", "Grace Townhomes", "Grove Park", "Holiday", "La Promesa", "Lexington", "Walnut Hill"],
+    "Region 3": ["Bayou Pointe", "Gates of Manhattan", "Howell Place", "Marrero", "North Pointe", "Pelican Bay", "Pirates Bend", "Ruby Diamond", "St. Charles", "Star", "Thibodaux", "Windsor / Yorkshire"],
+    "Region 4": ["Anaheim Gardens", "Columbia", "Fairfax", "Forest View", "Granite Ridge", "Midtown", "Oak Hills", "Pacific", "River Garden", "Urban", "Wilmington"]
+  },
+  "not_on_myloneworkers": ["Anaheim Gardens", "Fairfax", "Urban"]
+}

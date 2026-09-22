@@ -114,3 +114,7 @@ client/public/__manus__/version.json
 .project-config.json
 .vercel
 .env*
+
+# Scraper run artifacts (reports contain unit-level inspection data)
+scraper/output/
+scraper/diagnostics/

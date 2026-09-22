@@ -11,9 +11,12 @@ than rebuilding from memory: the behaviour details below are inferred.
 
 Downloads monthly inspection PDFs from MyLoneWorkers.
 
-**Status:** rebuilt. Lives in `scraper/`, runs on the self-hosted macOS
-runner via `.github/workflows/scrape-inspections.yml`. Recovered from
-`inspections-app 4.zip`, which had never run end to end.
+**Status:** rebuilt twice. The first version (recovered from
+`inspections-app 4.zip`) drove the Events Browser UI and credited scans to
+whichever login did them. It now reads the MyLoneWorkers events API directly,
+credits scans by checkpoint site, records a reason for every property, and
+generates its own PDF reports. See `scraper/README.md`. Runs on the
+self-hosted macOS runner via `.github/workflows/scrape-inspections.yml`.
 
 **Verified absent from the repo:** no scraper file in any of the 133 files
 that have ever existed in this repository's history.

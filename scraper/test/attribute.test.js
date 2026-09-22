@@ -1,0 +1,106 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const path = require('path');
+const fs = require('fs');
+const { attribute, makeSiteResolver, siteCandidates } = require('../lib/attribute');
+const { monthWindows } = require('../lib/time');
+const { septemberEvents, TZ } = require('./fixtures');
+
+const read = f => JSON.parse(fs.readFileSync(path.join(__dirname, '..', f), 'utf8'));
+const portal = read('portal-properties.json');
+const siteMap = read('site-map.json');
+const workers = read('workers.json');
+const rawMap = read('property-map.json');
+const propertyMap = { ...rawMap.confirmed, ...rawMap.needs_confirmation };
+
+function run(events = septemberEvents(), minUnits = 3) {
+  const windows = monthWindows('2026-09', { timeZone: TZ });
+  const out = attribute({ events, windows, portal, siteMap, workers, propertyMap, minUnits });
+  const by = Object.fromEntries(out.results.map(r => [r.property, r]));
+  return { ...out, by };
+}
+
+test('scans are credited to the site where they happened, not the login', () => {
+  const { by } = run();
+  assert.equal(by['Breckenridge'].status, 'pass');
+  assert.equal(by['Breckenridge'].units, 8);
+  assert.match(by['Breckenridge'].note, /Grace Townhomes Manager/);
+  assert.equal(by['Grace Townhomes'].status, 'pass');
+  assert.equal(by['Grace Townhomes'].units, 7);
+});
+
+test("a login that only scanned other properties does not pass its own", () => {
+  const { by } = run();
+  assert.equal(by['Star'].status, 'other_sites_only');
+  assert.equal(by['Star'].xed, true);
+  assert.match(by['Star'].note, /Marrero/);
+  assert.match(by['Star'].note, /Ruby Diamond/);
+});
+
+test('one or two units is partial, not a pass', () => {
+  const { by } = run();
+  assert.equal(by['Marrero'].status, 'partial');
+  assert.equal(by['Ruby Diamond'].status, 'partial');
+  assert.equal(by['Marrero'].checked, false);
+});
+
+test('an inspection finished after the 21st is marked late but done', () => {
+  const { by } = run();
+  assert.equal(by['Lexington'].status, 'late');
+  assert.equal(by['Lexington'].checked, true);
+  assert.equal(by['Lexington'].onTimeUnits, 1); // the stray 9/17 scan
+  assert.match(by['Lexington'].note, /LATE/);
+});
+
+test('a tour with no unit scans is flagged with that reason', () => {
+  const { by } = run();
+  assert.equal(by['Grove Park'].status, 'tour_no_scans');
+  assert.match(by['Grove Park'].note, /no units were scanned/);
+});
+
+test('normal on-time inspection passes', () => {
+  const { by } = run();
+  assert.equal(by['River Pointe'].status, 'pass');
+  assert.equal(by['River Pointe'].units, 12);
+});
+
+test('properties with no activity say so, and off-platform ones are skipped', () => {
+  const { by } = run();
+  assert.equal(by['Coral Village'].status, 'no_activity');
+  assert.match(by['Coral Village'].note, /21st/);
+  assert.equal(by['Fairfax'].skip, true);
+});
+
+test('every property gets a reason', () => {
+  const { results } = run();
+  const total = Object.values(portal.regions).flat().length;
+  assert.equal(results.length, total);
+  for (const r of results) assert.ok(r.note && r.note.length > 10, `${r.property} has no note`);
+});
+
+test('unmapped sites are reported instead of silently dropped', () => {
+  const { unmatchedSites } = run();
+  assert.deepEqual(unmatchedSites.map(u => u.site), ['Brand New Place - Brand New Place']);
+});
+
+test('site names resolve by name when not in the explicit map', () => {
+  const resolve = makeSiteResolver({ portal, siteMap });
+  const names = c => (resolve(c) || []).map(d => d.property).sort();
+  assert.deepEqual(names('Silver Springs Terrace - Silver Springs Terrace'), ['Silver Springs']);
+  assert.deepEqual(names('Gates On Manhattan - Gates On Manhattan'), ['Gates of Manhattan']);
+  assert.deepEqual(names('Windsor Apts - Windsor Apts'), ['Windsor / Yorkshire']);
+  assert.deepEqual(names('River Gardens - River Gardens'), ['River Garden']);
+  assert.deepEqual(names('North Pointe - Bayou Pointe'), ['Bayou Pointe', 'North Pointe']);
+  assert.deepEqual(names('Starbucks - Starbucks'), []);
+});
+
+test('client strings of the form "X - X" collapse to X', () => {
+  assert.deepEqual(siteCandidates('Lexington Arms - Lexington Arms'), ['Lexington Arms', 'Lexington Arms - Lexington Arms']);
+});
+
+test('site-map targets are all real portal properties', () => {
+  const all = new Set(Object.values(portal.regions).flat());
+  for (const [site, target] of Object.entries(siteMap.sites)) {
+    for (const t of [].concat(target)) assert.ok(all.has(t), `${site} -> ${t} is not a portal property`);
+  }
+});

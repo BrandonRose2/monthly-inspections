@@ -1,0 +1,34 @@
+{
+  "_comment": [
+    "Maps a MyLoneWorkers SITE (the part of checkpoint.client before ' - ') to",
+    "the portal property it belongs to. Unit scans are credited by where they",
+    "happened, not by whose login did the scanning.",
+    "",
+    "Names marked 'verified' were seen on real scans in Sept 2026. Sites not",
+    "listed here are matched by name (see lib/attribute.js); any site that",
+    "still cannot be matched is listed under unmatchedSites in",
+    "output/results.json so it can be added here."
+  ],
+  "sites": {
+    "Boca Ciega Townhomes Apts": "Boca Ciega",
+    "Breckenridge Village": "Breckenridge",
+    "Crossroads of Lee Summit": "Crossroads",
+    "Grace Townhomes": "Grace Townhomes",
+    "Holiday Apts": "Holiday",
+    "Lexington Arms": "Lexington",
+    "Macedonia Garden Apts": "Macedonia",
+    "Marrero 3": "Marrero",
+    "New Wilmington Arms": "Wilmington",
+    "Opa Locka 135th St Apts": "Opa Locka",
+    "River Point Apts": "River Pointe",
+    "Ruby Diamond": "Ruby Diamond",
+    "St Charles Place": "St. Charles",
+    "Yorkshire Apts": "Windsor / Yorkshire"
+  },
+  "verified": [
+    "Boca Ciega Townhomes Apts", "Breckenridge Village", "Crossroads of Lee Summit",
+    "Grace Townhomes", "Holiday Apts", "Lexington Arms", "Macedonia Garden Apts",
+    "Marrero 3", "New Wilmington Arms", "Opa Locka 135th St Apts", "River Point Apts",
+    "Ruby Diamond", "St Charles Place", "Yorkshire Apts"
+  ]
+}

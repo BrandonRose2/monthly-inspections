@@ -3,7 +3,7 @@ import { z } from "zod";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { machineProcedure, publicProcedure, router } from "./_core/trpc";
-import { deleteAllRecords, deleteMonthRecords, getHistorySummary, getMonthRecords, getRepeatOffenders, getSavedMonthKeys, upsertInspectionRecord } from "./db";
+import { deleteAllRecords, deleteMonthRecords, getHistorySummary, getMonthRecords, getRepeatOffenders, getSavedMonthKeys, setInspectionResult, upsertInspectionRecord } from "./db";
 import { storagePut } from "./storage";
 
 export const appRouter = router({
@@ -109,6 +109,50 @@ export const appRouter = router({
         });
 
         return { success: true, url };
+      }),
+
+    // Automated result from the inspections scraper: pass/fail, the reason, and
+    // (when the property had unit scans) a generated PDF report. Keeps any
+    // existing PDF when none is sent.
+    ingestInspectionResult: machineProcedure
+      .input(
+        z.object({
+          monthKey: z.string().regex(/^\d{4}-\d{2}$/),
+          region: z.string(),
+          property: z.string(),
+          checked: z.boolean(),
+          xed: z.boolean(),
+          note: z.string().max(2000),
+          fileName: z.string().optional(),
+          fileBase64: z.string().optional(),
+          fileSize: z.number().optional(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        let pdf: { name: string; key: string; size: number; uploadedAt: string } | null = null;
+        if (input.fileBase64 && input.fileName) {
+          const buffer = Buffer.from(input.fileBase64, "base64");
+          if (buffer.subarray(0, 4).toString() !== "%PDF") {
+            throw new Error("fileBase64 is not a PDF");
+          }
+          const safeProperty = input.property.replace(/[^a-zA-Z0-9]/g, "_");
+          const safeFileName = input.fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
+          const key = `inspections/${input.monthKey}/${safeProperty}/${Date.now()}_${safeFileName}`;
+          const { url } = await storagePut(key, buffer, "application/pdf");
+          pdf = { name: input.fileName, key: url, size: input.fileSize ?? buffer.length, uploadedAt: new Date().toISOString() };
+        }
+
+        await setInspectionResult({
+          monthKey: input.monthKey,
+          region: input.region,
+          property: input.property,
+          checked: input.checked,
+          xed: input.xed,
+          note: input.note,
+          pdf,
+        });
+
+        return { success: true, pdfUrl: pdf?.key ?? null };
       }),
 
     uploadPdf: publicProcedure

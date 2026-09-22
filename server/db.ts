@@ -133,6 +133,55 @@ export async function upsertInspectionRecord(record: InsertInspectionRecord) {
   }
 }
 
+/**
+ * Record an automated inspection result. Unlike upsertInspectionRecord, this
+ * leaves an existing PDF in place when no new one is supplied, so a scrape
+ * that finds nothing never erases a report somebody uploaded by hand.
+ */
+export async function setInspectionResult(record: {
+  monthKey: string;
+  region: string;
+  property: string;
+  checked: boolean;
+  xed: boolean;
+  note: string | null;
+  pdf?: { name: string; key: string; size: number; uploadedAt: string } | null;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const existing = await db
+    .select()
+    .from(inspectionRecords)
+    .where(
+      and(
+        eq(inspectionRecords.monthKey, record.monthKey),
+        eq(inspectionRecords.region, record.region),
+        eq(inspectionRecords.property, record.property)
+      )
+    )
+    .limit(1);
+
+  const status = { checked: record.checked, xed: record.xed, note: record.note };
+  const pdf = record.pdf
+    ? { pdfName: record.pdf.name, pdfKey: record.pdf.key, pdfSize: record.pdf.size, pdfUploadedAt: record.pdf.uploadedAt }
+    : {};
+
+  if (existing.length > 0) {
+    await db
+      .update(inspectionRecords)
+      .set({ ...status, ...pdf })
+      .where(eq(inspectionRecords.id, existing[0].id));
+  } else {
+    await db.insert(inspectionRecords).values({
+      monthKey: record.monthKey,
+      region: record.region,
+      property: record.property,
+      ...status,
+      ...pdf,
+    });
+  }
+}
+
 export async function deleteMonthRecords(monthKey: string): Promise<void> {
   const db = await getDb();
   if (!db) return;

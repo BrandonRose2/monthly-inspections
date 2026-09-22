@@ -350,6 +350,30 @@ async function upsertInspectionRecord(record) {
     await db.insert(inspectionRecords).values(record);
   }
 }
+async function setInspectionResult(record) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const existing = await db.select().from(inspectionRecords).where(
+    and(
+      eq(inspectionRecords.monthKey, record.monthKey),
+      eq(inspectionRecords.region, record.region),
+      eq(inspectionRecords.property, record.property)
+    )
+  ).limit(1);
+  const status = { checked: record.checked, xed: record.xed, note: record.note };
+  const pdf = record.pdf ? { pdfName: record.pdf.name, pdfKey: record.pdf.key, pdfSize: record.pdf.size, pdfUploadedAt: record.pdf.uploadedAt } : {};
+  if (existing.length > 0) {
+    await db.update(inspectionRecords).set({ ...status, ...pdf }).where(eq(inspectionRecords.id, existing[0].id));
+  } else {
+    await db.insert(inspectionRecords).values({
+      monthKey: record.monthKey,
+      region: record.region,
+      property: record.property,
+      ...status,
+      ...pdf
+    });
+  }
+}
 async function deleteMonthRecords(monthKey) {
   const db = await getDb();
   if (!db) return;
@@ -541,6 +565,45 @@ var appRouter = router({
         pdfUploadedAt: (/* @__PURE__ */ new Date()).toISOString()
       });
       return { success: true, url };
+    }),
+    // Automated result from the inspections scraper: pass/fail, the reason, and
+    // (when the property had unit scans) a generated PDF report. Keeps any
+    // existing PDF when none is sent.
+    ingestInspectionResult: machineProcedure.input(
+      z2.object({
+        monthKey: z2.string().regex(/^\d{4}-\d{2}$/),
+        region: z2.string(),
+        property: z2.string(),
+        checked: z2.boolean(),
+        xed: z2.boolean(),
+        note: z2.string().max(2e3),
+        fileName: z2.string().optional(),
+        fileBase64: z2.string().optional(),
+        fileSize: z2.number().optional()
+      })
+    ).mutation(async ({ input }) => {
+      let pdf = null;
+      if (input.fileBase64 && input.fileName) {
+        const buffer = Buffer.from(input.fileBase64, "base64");
+        if (buffer.subarray(0, 4).toString() !== "%PDF") {
+          throw new Error("fileBase64 is not a PDF");
+        }
+        const safeProperty = input.property.replace(/[^a-zA-Z0-9]/g, "_");
+        const safeFileName = input.fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
+        const key = `inspections/${input.monthKey}/${safeProperty}/${Date.now()}_${safeFileName}`;
+        const { url } = await storagePut(key, buffer, "application/pdf");
+        pdf = { name: input.fileName, key: url, size: input.fileSize ?? buffer.length, uploadedAt: (/* @__PURE__ */ new Date()).toISOString() };
+      }
+      await setInspectionResult({
+        monthKey: input.monthKey,
+        region: input.region,
+        property: input.property,
+        checked: input.checked,
+        xed: input.xed,
+        note: input.note,
+        pdf
+      });
+      return { success: true, pdfUrl: pdf?.key ?? null };
     }),
     uploadPdf: publicProcedure.input(
       z2.object({
