@@ -9,6 +9,10 @@
  *   GEOFENCE:    true  likewise narrows the results; keep it false.
  */
 const API_URL = process.env.MLW_API_URL || 'https://ws.myloneworkers.com/api/v3/events/';
+// The "Print All Forms -> Export Form to PDF" menu calls this; verified live Sept 2026.
+// Body: { FormSubmissions: "[id,id,...]" (a JSON string), reportType: "pdf" } -> application/pdf
+const FORMS_URL = process.env.MLW_FORMS_URL || API_URL.replace(/events\/?$/, 'printMobileForm');
+const FORMS_PER_REQUEST = 20;
 const PAGE_SIZE = 100;
 
 function eventsQuery({ guardIds, from, to, limit = PAGE_SIZE, offset = 0 }) {
@@ -93,4 +97,31 @@ async function fetchAllEvents(token, { guardIds, from, to }) {
   return [...byId.values()].sort((a, b) => a.scanTimestamp - b.scanTimestamp);
 }
 
-module.exports = { fetchAllEvents, eventsQuery, SessionExpiredError, API_URL };
+/**
+ * MyLoneWorkers' own inspection-forms report (every room, note and photo) for
+ * the given form submissions, as one PDF per request. Large lists are split
+ * into several requests; the caller merges the parts.
+ * @returns {Promise<Buffer[]>}
+ */
+async function fetchFormsPdfs(token, formIds, { timeoutMs = 300000 } = {}) {
+  const ids = [...new Set(formIds.filter(Boolean))];
+  const parts = [];
+  for (let i = 0; i < ids.length; i += FORMS_PER_REQUEST) {
+    const chunk = ids.slice(i, i + FORMS_PER_REQUEST);
+    const res = await fetch(FORMS_URL, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', accept: 'application/pdf', 'x-access-token': token },
+      body: JSON.stringify({ FormSubmissions: JSON.stringify(chunk), reportType: 'pdf' }),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (res.status === 401 || res.status === 403) throw new SessionExpiredError(`MyLoneWorkers rejected the session (${res.status})`);
+    const buf = Buffer.from(await res.arrayBuffer());
+    if (!res.ok || buf.subarray(0, 4).toString() !== '%PDF') {
+      throw new Error(`forms report request failed (${res.status}): ${buf.subarray(0, 200).toString()}`);
+    }
+    parts.push(buf);
+  }
+  return parts;
+}
+
+module.exports = { fetchAllEvents, fetchFormsPdfs, eventsQuery, SessionExpiredError, API_URL, FORMS_URL, FORMS_PER_REQUEST };

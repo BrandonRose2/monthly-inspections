@@ -199,7 +199,9 @@ function attribute({ events, windows, portal, siteMap, workers, propertyMap, min
     const allUnits = units([...p.onTime, ...p.late]);
     const inspectors = [...new Set([...p.onTime, ...p.late].map(e => workerNameOf(e.guard_details)))];
     const days = list => [...new Set(list.map(e => formatLocalDate(e.scanTimestamp, tz)))];
-    const by = inspectors.length ? ` by ${listNames(inspectors)}` : '';
+    const forms = new Set([...p.onTime, ...p.late].map(e => e.formID).filter(Boolean)).size;
+    const by = (inspectors.length ? ` by ${listNames(inspectors)}` : '') +
+      (forms ? `; ${forms} inspection form${forms === 1 ? '' : 's'} filed` : '');
 
     let status, note;
     if (onTimeUnits.size >= minUnits) {
@@ -236,6 +238,7 @@ function attribute({ events, windows, portal, siteMap, workers, propertyMap, min
       xed: !(status === 'pass' || status === 'late'),
       note,
       units: allUnits.size,
+      forms,
       onTimeUnits: onTimeUnits.size,
       inspectors,
       scans: [...p.onTime, ...p.late].sort((a, b) => a.scanTimestamp - b.scanTimestamp),

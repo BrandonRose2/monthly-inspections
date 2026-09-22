@@ -46,7 +46,7 @@ function buildReportPdf({ result, monthLabel, windows, generatedAt = new Date() 
 
     const inspectors = result.inspectors?.length ? result.inspectors.join(', ') : '—';
     doc.fontSize(10).fillColor('#333')
-      .text(`Units scanned: ${result.units}   ·   On time: ${result.onTimeUnits}   ·   Inspector(s): ${inspectors}`)
+      .text(`Units scanned: ${result.units}   ·   On time: ${result.onTimeUnits}   ·   Forms filed: ${result.forms ?? 0}   ·   Inspector(s): ${inspectors}`)
       .text(`Due by: ${formatLocal(windows.dueEnd, tz)} (${tz})`);
     doc.moveDown(1);
 
@@ -55,7 +55,8 @@ function buildReportPdf({ result, monthLabel, windows, generatedAt = new Date() 
       { h: 'Date / time', w: 130 },
       { h: 'Unit / checkpoint', w: 180 },
       { h: 'Inspector', w: 140 },
-      { h: 'Tour', w: 50 },
+      { h: 'Form', w: 45 },
+      { h: 'Tour', w: 45 },
     ];
     const x0 = doc.page.margins.left;
     const drawRow = (cells, bold) => {
@@ -83,13 +84,14 @@ function buildReportPdf({ result, monthLabel, windows, generatedAt = new Date() 
         formatLocal(e.scanTimestamp, tz) + late,
         unitLabel(e),
         String(e.guard_details || '').replace(/\s*\([0-9a-f]{10}\)\s*$/i, ''),
+        e.formID ? 'yes' : '—',
         e.patrolID ?? '',
       ]);
     }
 
     doc.moveDown(1.5);
     doc.font('Helvetica').fontSize(8).fillColor('#777')
-      .text(`Source: MyLoneWorkers events API. Scans credited by checkpoint site. Generated ${generatedAt.toLocaleString('en-US', { timeZone: tz })}.`, x0);
+      .text(`Source: MyLoneWorkers events API. Scans credited by checkpoint site.${result.forms ? " The pages after this one are MyLoneWorkers' own forms report for these scans." : ''} Generated ${generatedAt.toLocaleString('en-US', { timeZone: tz })}.`, x0);
 
     doc.end();
   });

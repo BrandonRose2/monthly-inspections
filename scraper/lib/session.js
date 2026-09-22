@@ -1,15 +1,15 @@
 /**
- * Borrow the API token from the signed-in browser profile.
+ * Use the runner's signed-in browser profile.
  *
- * The runner's persistent Chrome profile (created by `npm run setup:session`)
- * holds the MyLoneWorkers login. We open the Events Browser once, read the
- * token the site itself sends on its API calls, and close the browser. After
- * that everything goes through the JSON API — no clicking, no selectors, no
- * PDF downloads to wait on.
+ * The persistent Chrome profile (created by `npm run setup:session`) holds the
+ * MyLoneWorkers login. We open the Events Browser once, read the API token the
+ * site itself sends, and close the browser; everything else goes through the
+ * JSON API.
  *
  * The token is only held in memory and never logged or written to disk.
  */
 const puppeteer = require('puppeteer');
+const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
@@ -28,58 +28,70 @@ function tokenFromStorageValue(raw) {
   return typeof v === 'string' && v.split('.').length === 3 ? v : null;
 }
 
-async function getApiToken({ headless = true, diagnosticsDir } = {}) {
+async function saveDiagnostics(page, dir, label) {
+  if (!dir || !page) return;
+  fs.mkdirSync(dir, { recursive: true });
+  const stamp = label.replace(/[^a-z0-9_-]/gi, '_');
+  try {
+    await page.screenshot({ path: path.join(dir, `${stamp}.png`), fullPage: true });
+    console.warn(`  diagnostics written: diagnostics/${stamp}.png`);
+  } catch { /* best effort */ }
+}
+
+/** @returns {Promise<{ browser, page, token }>} caller must browser.close() */
+async function openSession({ headless = true, diagnosticsDir, downloadDir } = {}) {
   const browser = await puppeteer.launch({
     headless,
     userDataDir: PROFILE_DIR,
-    defaultViewport: { width: 1400, height: 900 },
+    defaultViewport: { width: 1500, height: 950 },
     args: ['--no-sandbox', '--disable-setuid-sandbox'],
   });
   try {
     const page = (await browser.pages())[0] || (await browser.newPage());
 
-    // Preferred source: the header on the site's own API requests.
-    let captured = null;
+    if (downloadDir) {
+      fs.mkdirSync(downloadDir, { recursive: true });
+      const cdp = await page.target().createCDPSession();
+      await cdp.send('Browser.setDownloadBehavior', { behavior: 'allow', downloadPath: downloadDir, eventsEnabled: true }).catch(() => {});
+      await cdp.send('Page.setDownloadBehavior', { behavior: 'allow', downloadPath: downloadDir }).catch(() => {});
+    }
+
+    let token = null;
     page.on('request', req => {
-      if (captured || !req.url().includes('ws.myloneworkers.com')) return;
+      if (token || !req.url().includes('ws.myloneworkers.com')) return;
       const t = req.headers()['x-access-token'];
-      if (t && t.split('.').length === 3) captured = t;
+      if (t && t.split('.').length === 3) token = t;
     });
 
-    await page.goto(MLW_URL, { waitUntil: 'networkidle2', timeout: 60000 });
-
-    for (let i = 0; i < 20 && !captured; i++) {
+    await page.goto(MLW_URL, { waitUntil: 'networkidle2', timeout: 90000 });
+    for (let i = 0; i < 20 && !token; i++) {
       await sleep(500);
       if (/\/login/i.test(page.url())) break;
     }
 
     if (/\/login/i.test(page.url())) {
-      if (diagnosticsDir) await saveDiagnostics(page, diagnosticsDir, 'session-expired');
+      await saveDiagnostics(page, diagnosticsDir, 'session-expired');
       throw new Error('MyLoneWorkers session has expired. Run `npm run setup:session` on the runner and sign in again.');
     }
-
-    // Fallback: the site keeps the same token in localStorage.
-    if (!captured) {
+    if (!token) {
       const raw = await page.evaluate(() => localStorage.getItem('qrp_api_jwt')).catch(() => null);
-      captured = tokenFromStorageValue(raw);
+      token = tokenFromStorageValue(raw);
     }
-    if (!captured) {
-      if (diagnosticsDir) await saveDiagnostics(page, diagnosticsDir, 'no-token');
+    if (!token) {
+      await saveDiagnostics(page, diagnosticsDir, 'no-token');
       throw new Error('Signed in, but could not find the MyLoneWorkers API token on the page.');
     }
-    return captured;
-  } finally {
-    await browser.close();
+    return { browser, page, token };
+  } catch (err) {
+    await browser.close().catch(() => {});
+    throw err;
   }
 }
 
-async function saveDiagnostics(page, dir, label) {
-  const fs = require('fs');
-  fs.mkdirSync(dir, { recursive: true });
-  try {
-    await page.screenshot({ path: path.join(dir, `${label}.png`), fullPage: true });
-    console.warn(`  diagnostics written: diagnostics/${label}.png`);
-  } catch { /* best effort */ }
+async function getApiToken(opts) {
+  const { browser, token } = await openSession(opts);
+  await browser.close().catch(() => {});
+  return token;
 }
 
-module.exports = { getApiToken, tokenFromStorageValue, PROFILE_DIR };
+module.exports = { getApiToken, openSession, tokenFromStorageValue, saveDiagnostics, PROFILE_DIR, MLW_URL };

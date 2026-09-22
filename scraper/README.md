@@ -1,8 +1,11 @@
 # Monthly Inspections Scraper
 
 Pulls a month of inspection activity from MyLoneWorkers, decides pass/fail
-for every portal property, builds a PDF report for each property that had unit
-scans, and files the result (status, reason, PDF) into the inspections portal.
+for every portal property, and files the result (status, reason, PDF) into the
+inspections portal. Each property's PDF is a one-page summary followed by
+MyLoneWorkers' own forms report: every unit's inspection form with its rooms,
+notes and photos, the same report as *Export To → Print All Forms → Export
+Form to PDF* in the Events Browser.
 
 This directory is **not** part of the Vercel deployment (see `.vercelignore`).
 It runs on the self-hosted macOS GitHub Actions runner
@@ -47,6 +50,12 @@ when the scraper has one to file.
    form* and hides ordinary QR unit scans.
 3. Attribution rules live in `lib/attribute.js` and are covered by
    `npm test`, which uses events modelled on real September 2026 data.
+4. For each property with unit scans, collects the scans' `formID`s and asks
+   `POST ws.myloneworkers.com/api/v3/printMobileForm` for the forms report
+   (body `{ "FormSubmissions": "[id,…]", "reportType": "pdf" }`, the request
+   the Print All Forms menu makes), 20 forms per request, and puts the
+   summary page in front (`lib/pdf-merge.js`). If that request fails, the
+   summary page is still filed and the note says the forms report is missing.
 
 ## One-time setup (on the runner)
 
@@ -77,6 +86,7 @@ PORTAL_BASE_URL=https://portal-production-1ac7.up.railway.app INGEST_TOKEN=… M
 | `TIME_ZONE` | `America/Los_Angeles` | the zone MyLoneWorkers displays |
 | `ONLY` | all | comma-separated portal properties to file, e.g. `Lexington,Breckenridge` |
 | `HEADLESS` | `true` | `false` to watch the token step |
+| `EXPORT_FORMS` | `true` | `false` attaches only the summary page |
 
 Output: `output/results.json` (every property, its status and reason, plus any
 unmapped sites) and `output/pdfs/<month>/`. CI keeps both as a run artifact
@@ -85,7 +95,9 @@ for 90 days.
 ## Keeping the mappings current
 
 - **`site-map.json`**: MyLoneWorkers site name → portal property. Sites not
-  listed are matched by name automatically. Anything that still cannot be
+  listed are matched by name automatically. Of the 44 MyLoneWorkers clients
+  (Sept 2026), 38 match a portal property; Central Apts, Village Green Apts,
+  Riverchase Apts, Anaheim Apts and Virgina Walnut do not yet. Anything that still cannot be
   matched is printed at the end of the run and listed under `unmatchedSites`;
   add it here.
 - **`workers.json` / `property-map.json`**: which login belongs to which

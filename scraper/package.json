@@ -2,7 +2,7 @@
   "name": "monthly-inspections-scraper",
   "private": true,
   "version": "1.0.0",
-  "description": "Pulls monthly inspection activity from MyLoneWorkers and files pass/fail results and PDF reports into the inspections portal",
+  "description": "Pulls monthly inspection activity and forms reports from MyLoneWorkers and files pass/fail results with PDFs into the inspections portal",
   "type": "commonjs",
   "scripts": {
     "setup:session": "node setup-session.js",
@@ -10,7 +10,8 @@
     "test": "node --test test/*.test.js"
   },
   "dependencies": {
-    "puppeteer": "^23.0.0",
-    "pdfkit": "^0.17.0"
+    "pdf-lib": "^1.17.1",
+    "pdfkit": "^0.17.0",
+    "puppeteer": "^23.0.0"
   }
 }

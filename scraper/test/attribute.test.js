@@ -62,6 +62,9 @@ test('normal on-time inspection passes', () => {
   const { by } = run();
   assert.equal(by['River Pointe'].status, 'pass');
   assert.equal(by['River Pointe'].units, 12);
+  assert.equal(by['River Pointe'].forms, 5);
+  assert.match(by['River Pointe'].note, /5 inspection forms filed/);
+  assert.doesNotMatch(by['Breckenridge'].note, /forms filed/);
 });
 
 test('properties with no activity say so, and off-platform ones are skipped', () => {

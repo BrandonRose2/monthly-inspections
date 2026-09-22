@@ -8,10 +8,11 @@ const TZ = 'America/Los_Angeles';
 let nextId = 1;
 const at = (d, hh, mm) => zonedToEpoch(TZ, 2026, 9, d, hh, mm);
 
-function ev({ day, hh = 7, mm = 0, type = 'SCAN', guard, client = null, unit = null, tour = 1 }) {
+function ev({ day, hh = 7, mm = 0, type = 'SCAN', guard, client = null, unit = null, tour = 1, form = null }) {
   const id = nextId++;
   return {
     ID: id,
+    formID: form,
     snapshot: type,
     scanTimestamp: at(day, hh, mm),
     guard_details: guard,
@@ -53,7 +54,8 @@ function septemberEvents() {
 
   // River Pointe: a normal on-time inspection.
   e.push(ev({ day: 21, hh: 9, type: 'START', guard: RIVER, tour: 126 }));
-  for (let i = 0; i < 12; i++) e.push(ev({ day: 21, hh: 9, mm: 1 + i, guard: RIVER, client: 'River Point Apts - River Point Apts', unit: 100 + i, tour: 126 }));
+  // River Pointe: a normal on-time inspection; 5 of the 12 units have a filled-in form.
+  for (let i = 0; i < 12; i++) e.push(ev({ day: 21, hh: 9, mm: 1 + i, guard: RIVER, client: 'River Point Apts - River Point Apts', unit: 100 + i, tour: 126, form: i < 5 ? 1242000 + i : null }));
   e.push(ev({ day: 21, hh: 9, mm: 30, type: 'FINISH', guard: RIVER, tour: 126 }));
 
   // A site nobody has mapped yet.

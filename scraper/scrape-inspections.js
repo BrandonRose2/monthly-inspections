@@ -2,8 +2,9 @@
  * scrape-inspections.js
  *
  * Pulls a month of inspection activity from MyLoneWorkers, decides pass/fail
- * for every portal property, builds a PDF report for each property that had
- * unit scans, and files the result (status + reason + PDF) into the portal.
+ * for every portal property, and files the result (status + reason + PDF)
+ * into the portal. The PDF is a one-page summary followed by MyLoneWorkers'
+ * own "Print All Forms" report (every unit's form: rooms, notes, photos).
  *
  * How it works:
  *   1. Borrow the API token from the runner's signed-in browser profile
@@ -12,7 +13,10 @@
  *      via the same JSON API the Events Browser page uses.
  *   3. Credit each unit scan to the property where it happened (checkpoint
  *      site), not to the login that did it. See lib/attribute.js.
- *   4. File each property's result into the portal.
+ *   4. For each property with unit scans, fetch MyLoneWorkers' forms report
+ *      for those scans' form submissions (the same report as Export To ->
+ *      Print All Forms -> Export Form to PDF) and put the summary in front.
+ *   5. File each property's result into the portal.
  *
  *   PORTAL_BASE_URL=https://portal-production-1ac7.up.railway.app INGEST_TOKEN=... npm run scrape
  *
@@ -24,13 +28,15 @@
  *   TIME_ZONE=America/Los_Angeles
  *   ONLY="Lexington,Breckenridge"   limit filing to these portal properties
  *   HEADLESS=false    show the browser while borrowing the token
+ *   EXPORT_FORMS=false  skip the forms report; attach only the summary page
  */
 const fs = require('fs');
 const path = require('path');
 const { monthWindows, currentMonthKey } = require('./lib/time');
-const { fetchAllEvents, SessionExpiredError } = require('./lib/mlw-api');
+const { fetchAllEvents, fetchFormsPdfs, SessionExpiredError } = require('./lib/mlw-api');
 const { attribute } = require('./lib/attribute');
 const { buildReportPdf } = require('./lib/report-pdf');
+const { mergePdfs } = require('./lib/pdf-merge');
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
@@ -43,6 +49,7 @@ const CONFIG = {
   minUnits: Number(process.env.MIN_UNITS || 3),
   only: (process.env.ONLY || '').split(',').map(s => s.trim()).filter(Boolean),
   headless: process.env.HEADLESS !== 'false',
+  exportForms: process.env.EXPORT_FORMS !== 'false',
   outputDir: path.join(__dirname, 'output'),
   diagnosticsDir: path.join(__dirname, 'diagnostics'),
 };
@@ -57,7 +64,7 @@ function loadPropertyMap() {
 }
 
 async function borrowToken() {
-  // For local testing you can hand in a token directly; the runner never does.
+  // MLW_TOKEN is for local testing only; the runner always uses the browser session.
   if (process.env.MLW_TOKEN) return process.env.MLW_TOKEN;
   const { getApiToken } = require('./lib/session'); // loads puppeteer only when needed
   return getApiToken({ headless: CONFIG.headless, diagnosticsDir: CONFIG.diagnosticsDir });
@@ -124,19 +131,34 @@ async function run() {
     }
     try {
       let pdf = null;
+      let formsPages = 0;
       if (r.scans.length) {
+        const parts = [];
+        const formIds = [...new Set(r.scans.map(e => e.formID).filter(Boolean))];
+        if (CONFIG.exportForms && formIds.length) {
+          try {
+            parts.push(...(await fetchFormsPdfs(token, formIds)));
+          } catch (err) {
+            if (err instanceof SessionExpiredError) throw err;
+            console.warn(`     forms report not attached: ${err.message}`);
+            r.note += ' (MyLoneWorkers forms report could not be attached; see the scraper log.)';
+          }
+        }
+        const cover = await buildReportPdf({ result: r, monthLabel, windows });
+        const buffer = parts.length ? await mergePdfs([cover, ...parts]) : cover;
+        formsPages = parts.length ? (await require('pdf-lib').PDFDocument.load(buffer)).getPageCount() - 1 : 0;
         const fileName = `${r.property.replace(/[^a-z0-9]/gi, '_')}_${monthKey}.pdf`;
-        const buffer = await buildReportPdf({ result: r, monthLabel, windows });
         fs.writeFileSync(path.join(pdfDir, fileName), buffer);
         pdf = { fileName, buffer };
       }
       if (!CONFIG.dryRun) await fileResult({ monthKey, result: r, pdf });
       filed++;
-      console.log(`  ${CONFIG.dryRun ? 'dry ' : 'filed'} ${line}`);
+      console.log(`  ${CONFIG.dryRun ? 'dry ' : 'filed'} ${line}${formsPages ? ` [+${formsPages} form pages]` : ''}`);
       summary.push({ region: r.region, property: r.property, status: r.status, checked: r.checked, xed: r.xed,
-        note: r.note, units: r.units, onTimeUnits: r.onTimeUnits, inspectors: r.inspectors, pdf: pdf?.fileName ?? null,
+        note: r.note, units: r.units, onTimeUnits: r.onTimeUnits, inspectors: r.inspectors, pdf: pdf?.fileName ?? null, formsPages,
         filed: !CONFIG.dryRun });
     } catch (err) {
+      if (err instanceof SessionExpiredError) throw err;
       failed++;
       console.warn(`  FAIL  ${line}\n        ${err.message}`);
       summary.push({ region: r.region, property: r.property, status: r.status, error: err.message, filed: false });
