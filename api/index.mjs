@@ -457,27 +457,76 @@ async function getRepeatOffenders(minConsecutive = 2) {
 }
 
 // server/storage.ts
-import { put } from "@vercel/blob";
+import { randomBytes } from "crypto";
 function normalizeKey(relKey) {
   return relKey.replace(/^\/+/, "");
 }
-function assertConfigured() {
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    throw new Error(
-      "Storage config missing: connect a Vercel Blob store so BLOB_READ_WRITE_TOKEN is set"
-    );
-  }
+var FILES_ROUTE = "/files";
+function bucketConfigured() {
+  return !!process.env.BUCKET;
+}
+var _s3 = null;
+async function s3() {
+  if (_s3) return _s3;
+  const { S3Client } = await import("@aws-sdk/client-s3");
+  const missing = ["BUCKET_ENDPOINT", "BUCKET_ACCESS_KEY_ID", "BUCKET_SECRET_ACCESS_KEY"].filter(
+    (k) => !process.env[k]
+  );
+  if (missing.length) throw new Error(`Storage config missing: ${missing.join(", ")}`);
+  _s3 = new S3Client({
+    endpoint: process.env.BUCKET_ENDPOINT,
+    region: process.env.BUCKET_REGION || "auto",
+    forcePathStyle: process.env.BUCKET_PATH_STYLE === "true",
+    credentials: {
+      accessKeyId: process.env.BUCKET_ACCESS_KEY_ID,
+      secretAccessKey: process.env.BUCKET_SECRET_ACCESS_KEY
+    }
+  });
+  return _s3;
+}
+function withSuffix(key) {
+  const suffix = randomBytes(12).toString("hex");
+  const dot = key.lastIndexOf(".");
+  const slash = key.lastIndexOf("/");
+  return dot > slash ? `${key.slice(0, dot)}-${suffix}${key.slice(dot)}` : `${key}-${suffix}`;
 }
 async function storagePut(relKey, data, contentType = "application/octet-stream") {
-  assertConfigured();
   const pathname = normalizeKey(relKey);
   const body = typeof data === "string" || Buffer.isBuffer(data) ? data : Buffer.from(data);
-  const result = await put(pathname, body, {
-    access: "public",
-    contentType,
-    addRandomSuffix: true
-  });
-  return { key: result.url, url: result.url };
+  if (bucketConfigured()) {
+    const { PutObjectCommand } = await import("@aws-sdk/client-s3");
+    const key = withSuffix(pathname);
+    await (await s3()).send(
+      new PutObjectCommand({ Bucket: process.env.BUCKET, Key: key, Body: body, ContentType: contentType })
+    );
+    const url = `${FILES_ROUTE}/${key}`;
+    return { key: url, url };
+  }
+  if (process.env.BLOB_READ_WRITE_TOKEN) {
+    const { put } = await import("@vercel/blob");
+    const result = await put(pathname, body, { access: "public", contentType, addRandomSuffix: true });
+    return { key: result.url, url: result.url };
+  }
+  throw new Error(
+    "Storage config missing: set BUCKET (Railway bucket) or BLOB_READ_WRITE_TOKEN (Vercel Blob)"
+  );
+}
+async function storageRead(key) {
+  if (!bucketConfigured()) return null;
+  const { GetObjectCommand } = await import("@aws-sdk/client-s3");
+  try {
+    const out = await (await s3()).send(
+      new GetObjectCommand({ Bucket: process.env.BUCKET, Key: normalizeKey(key) })
+    );
+    return {
+      body: out.Body,
+      contentType: out.ContentType,
+      contentLength: out.ContentLength
+    };
+  } catch (err) {
+    if (err?.name === "NoSuchKey" || err?.$metadata?.httpStatusCode === 404) return null;
+    throw err;
+  }
 }
 
 // server/routers.ts
@@ -1011,6 +1060,29 @@ function registerOAuthRoutes(app2) {
 
 // server/_core/storageProxy.ts
 function registerStorageProxy(app2) {
+  app2.get(`${FILES_ROUTE}/*`, async (req, res) => {
+    const key = req.params[0];
+    if (!key || key.includes("..")) {
+      res.status(400).send("Bad file key");
+      return;
+    }
+    try {
+      const obj = await storageRead(key);
+      if (!obj) {
+        res.status(404).send("File not found");
+        return;
+      }
+      res.setHeader("Content-Type", obj.contentType || "application/octet-stream");
+      if (obj.contentLength) res.setHeader("Content-Length", String(obj.contentLength));
+      res.setHeader("Content-Disposition", `inline; filename="${key.split("/").pop()}"`);
+      res.setHeader("Cache-Control", "private, max-age=3600");
+      obj.body.on("error", () => res.destroy());
+      obj.body.pipe(res);
+    } catch (err) {
+      console.error("[StorageProxy] read failed:", err);
+      res.status(502).send("Could not read file from storage");
+    }
+  });
   app2.get("/manus-storage/*", (req, res) => {
     const key = req.params[0];
     if (!key) {
@@ -1019,7 +1091,7 @@ function registerStorageProxy(app2) {
     }
     console.warn(`[StorageProxy] legacy Forge key requested: ${key}`);
     res.status(410).send(
-      "This file was stored by the Manus Forge backend, which is no longer configured. Re-upload the PDF to store it in Vercel Blob."
+      "This file was stored by the Manus Forge backend, which is no longer configured. Re-upload the PDF to store it again."
     );
   });
 }

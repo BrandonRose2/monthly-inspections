@@ -14,7 +14,7 @@
  *      site), not to the login that did it. See lib/attribute.js.
  *   4. File each property's result into the portal.
  *
- *   PORTAL_BASE_URL=https://monthly-inspections.vercel.app INGEST_TOKEN=... npm run scrape
+ *   PORTAL_BASE_URL=https://portal-production-1ac7.up.railway.app INGEST_TOKEN=... npm run scrape
  *
  * Options (environment variables):
  *   MONTH=YYYY-MM     month to process (default: current month in TIME_ZONE)

@@ -65,7 +65,7 @@ stored anywhere; the only CI secret is `INGEST_TOKEN` (portal auth).
 ```sh
 cd scraper
 DRY_RUN=true MONTH=2026-09 npm run scrape                 # preview, files nothing
-PORTAL_BASE_URL=https://… INGEST_TOKEN=… MONTH=2026-09 npm run scrape
+PORTAL_BASE_URL=https://portal-production-1ac7.up.railway.app INGEST_TOKEN=… MONTH=2026-09 npm run scrape
 ```
 
 | Variable | Default | |

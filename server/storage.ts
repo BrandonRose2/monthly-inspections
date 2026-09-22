@@ -1,26 +1,55 @@
-// Object storage backed by Vercel Blob.
+// Object storage for inspection PDFs.
 //
-// Replaces the Manus Forge/S3 presigned-URL implementation, which required
-// BUILT_IN_FORGE_API_URL and BUILT_IN_FORGE_API_KEY from the Manus platform.
+// Two backends, picked from the environment:
 //
-// Vercel Blob serves uploads from a public CDN URL containing an unguessable
-// random suffix, so there is no separate signing step: the URL returned by
-// put() is the download URL. Callers store that URL directly.
+//   Railway bucket (S3-compatible)  when BUCKET is set.
+//     Railway buckets are private, so files are served back through this
+//     server at /files/<key> (see _core/storageProxy.ts). Keys carry a random
+//     suffix, so links stay unguessable just like the Blob URLs they replace.
+//     Variables: BUCKET, BUCKET_ENDPOINT, BUCKET_REGION, BUCKET_ACCESS_KEY_ID,
+//     BUCKET_SECRET_ACCESS_KEY, optional BUCKET_PATH_STYLE=true.
 //
-// Requires BLOB_READ_WRITE_TOKEN, which Vercel injects when a Blob store is
-// connected to the project.
-import { put } from "@vercel/blob";
+//   Vercel Blob  when BLOB_READ_WRITE_TOKEN is set (the earlier Vercel deploy).
+//     Uploads get a public CDN URL, stored directly as the download link.
+import { randomBytes } from "crypto";
+import type { Readable } from "stream";
 
 function normalizeKey(relKey: string): string {
   return relKey.replace(/^\/+/, "");
 }
 
-function assertConfigured() {
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    throw new Error(
-      "Storage config missing: connect a Vercel Blob store so BLOB_READ_WRITE_TOKEN is set"
-    );
-  }
+export const FILES_ROUTE = "/files";
+
+function bucketConfigured() {
+  return !!process.env.BUCKET;
+}
+
+let _s3: import("@aws-sdk/client-s3").S3Client | null = null;
+async function s3() {
+  if (_s3) return _s3;
+  const { S3Client } = await import("@aws-sdk/client-s3");
+  const missing = ["BUCKET_ENDPOINT", "BUCKET_ACCESS_KEY_ID", "BUCKET_SECRET_ACCESS_KEY"].filter(
+    k => !process.env[k]
+  );
+  if (missing.length) throw new Error(`Storage config missing: ${missing.join(", ")}`);
+  _s3 = new S3Client({
+    endpoint: process.env.BUCKET_ENDPOINT,
+    region: process.env.BUCKET_REGION || "auto",
+    forcePathStyle: process.env.BUCKET_PATH_STYLE === "true",
+    credentials: {
+      accessKeyId: process.env.BUCKET_ACCESS_KEY_ID!,
+      secretAccessKey: process.env.BUCKET_SECRET_ACCESS_KEY!,
+    },
+  });
+  return _s3;
+}
+
+/** Add a random suffix before the extension: a/b/report.pdf -> a/b/report-<hex>.pdf */
+function withSuffix(key: string) {
+  const suffix = randomBytes(12).toString("hex");
+  const dot = key.lastIndexOf(".");
+  const slash = key.lastIndexOf("/");
+  return dot > slash ? `${key.slice(0, dot)}-${suffix}${key.slice(dot)}` : `${key}-${suffix}`;
 }
 
 export async function storagePut(
@@ -28,37 +57,61 @@ export async function storagePut(
   data: Buffer | Uint8Array | string,
   contentType = "application/octet-stream"
 ): Promise<{ key: string; url: string }> {
-  assertConfigured();
   const pathname = normalizeKey(relKey);
+  const body = typeof data === "string" || Buffer.isBuffer(data) ? data : Buffer.from(data);
 
-  // addRandomSuffix keeps the unguessable-URL property the Forge
-  // implementation got from its manual hash suffix.
-  // @vercel/blob accepts string | Buffer | Blob | stream, but not a bare
-  // Uint8Array, so normalize before handing it over.
-  const body =
-    typeof data === "string" || Buffer.isBuffer(data) ? data : Buffer.from(data);
+  if (bucketConfigured()) {
+    const { PutObjectCommand } = await import("@aws-sdk/client-s3");
+    const key = withSuffix(pathname);
+    await (await s3()).send(
+      new PutObjectCommand({ Bucket: process.env.BUCKET, Key: key, Body: body, ContentType: contentType })
+    );
+    const url = `${FILES_ROUTE}/${key}`;
+    return { key: url, url };
+  }
 
-  const result = await put(pathname, body, {
-    access: "public",
-    contentType,
-    addRandomSuffix: true,
-  });
+  if (process.env.BLOB_READ_WRITE_TOKEN) {
+    const { put } = await import("@vercel/blob");
+    const result = await put(pathname, body, { access: "public", contentType, addRandomSuffix: true });
+    return { key: result.url, url: result.url };
+  }
 
-  // The public URL is both the identity and the download location, so callers
-  // can persist it straight into the pdfKey column.
-  return { key: result.url, url: result.url };
+  throw new Error(
+    "Storage config missing: set BUCKET (Railway bucket) or BLOB_READ_WRITE_TOKEN (Vercel Blob)"
+  );
+}
+
+/** Stream an object from the Railway bucket. Returns null when it does not exist. */
+export async function storageRead(
+  key: string
+): Promise<{ body: Readable; contentType?: string; contentLength?: number } | null> {
+  if (!bucketConfigured()) return null;
+  const { GetObjectCommand } = await import("@aws-sdk/client-s3");
+  try {
+    const out = await (await s3()).send(
+      new GetObjectCommand({ Bucket: process.env.BUCKET, Key: normalizeKey(key) })
+    );
+    return {
+      body: out.Body as Readable,
+      contentType: out.ContentType,
+      contentLength: out.ContentLength,
+    };
+  } catch (err: any) {
+    if (err?.name === "NoSuchKey" || err?.$metadata?.httpStatusCode === 404) return null;
+    throw err;
+  }
 }
 
 export async function storageGet(relKey: string): Promise<{ key: string; url: string }> {
+  if (/^https?:\/\//i.test(relKey) || relKey.startsWith(`${FILES_ROUTE}/`)) {
+    return { key: relKey, url: relKey };
+  }
   const key = normalizeKey(relKey);
-  // Already an absolute Blob URL — nothing to resolve.
-  if (/^https?:\/\//i.test(relKey)) return { key: relKey, url: relKey };
   return { key, url: `/manus-storage/${key}` };
 }
 
 export async function storageGetSignedUrl(relKey: string): Promise<string> {
-  // Public Blob URLs need no signing.
-  if (/^https?:\/\//i.test(relKey)) return relKey;
+  if (/^https?:\/\//i.test(relKey) || relKey.startsWith(`${FILES_ROUTE}/`)) return relKey;
   throw new Error(
     `Cannot resolve legacy storage key "${relKey}": it was stored by the Manus Forge backend, which is no longer configured`
   );
