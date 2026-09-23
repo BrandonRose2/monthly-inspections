@@ -15,6 +15,9 @@ import { appRouter } from "./routers";
 import { createContext } from "./_core/context";
 import { registerOAuthRoutes } from "./_core/oauth";
 import { registerStorageProxy } from "./_core/storageProxy";
+import { ensureSchema } from "./schema-setup";
+
+void ensureSchema();
 
 const app = express();
 

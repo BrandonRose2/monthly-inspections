@@ -68,6 +68,13 @@ function makeSiteResolver({ portal, siteMap }) {
       if (toks.length) patterns.push({ property: p, toks });
     }
   }
+  // Earlier short names ("Thibodaux", "Star") still match the site names
+  // MyLoneWorkers uses, which the longer current names may not.
+  for (const [alias, p] of Object.entries(portal.aliases || {})) {
+    if (!regionOf[p]) continue;
+    const toks = normTokens(alias);
+    if (toks.length) patterns.push({ property: p, toks });
+  }
 
   const cache = new Map();
   return function resolve(client) {

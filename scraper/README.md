@@ -7,7 +7,7 @@ MyLoneWorkers' own forms report: every unit's inspection form with its rooms,
 notes and photos, the same report as *Export To → Print All Forms → Export
 Form to PDF* in the Events Browser.
 
-This directory is **not** part of the Vercel deployment (see `.vercelignore`).
+This directory is **not** part of the portal deployment.
 It runs on the self-hosted macOS GitHub Actions runner
 (`.github/workflows/scrape-inspections.yml`), on the 22nd of each month and on
 demand.
@@ -34,7 +34,7 @@ Each property gets one status, and every status comes with a written reason:
 | `other_sites_only` | ✗ | The property's login scanned units, but at other properties |
 | `tour_no_scans` | ✗ | A tour was started/finished with no unit scans |
 | `no_activity` | ✗ | Nothing in MyLoneWorkers for the month |
-| `not_on_myloneworkers` | — | Anaheim Gardens, Fairfax, Urban: left for manual review |
+| `not_on_myloneworkers` | — | Fairfax, Central Apts / Urban Rehab: left for manual review |
 
 An existing PDF in the portal is never erased; a new report replaces it only
 when the scraper has one to file.
@@ -74,34 +74,50 @@ stored anywhere; the only CI secret is `INGEST_TOKEN` (portal auth).
 ```sh
 cd scraper
 DRY_RUN=true MONTH=2026-09 npm run scrape                 # preview, files nothing
+START_MONTH=2026-07 END_MONTH=2026-09 npm run scrape       # a range, one month at a time
 PORTAL_BASE_URL=https://portal-production-1ac7.up.railway.app INGEST_TOKEN=… MONTH=2026-09 npm run scrape
 ```
 
 | Variable | Default | |
 |---|---|---|
 | `MONTH` | current month | `YYYY-MM` |
+| `START_MONTH` / `END_MONTH` | `MONTH` | a range of months, inclusive |
+| `RUN_ID` | none | portal run to report progress to (the portal sets it) |
 | `DRY_RUN` | `false` | write `output/` only |
 | `MIN_UNITS` | `3` | units needed for a pass (repo variable `MIN_UNITS` in CI) |
 | `DUE_DAY` | `21` | deadline day |
 | `TIME_ZONE` | `America/Los_Angeles` | the zone MyLoneWorkers displays |
-| `ONLY` | all | comma-separated portal properties to file, e.g. `Lexington,Breckenridge` |
+| `ONLY` | all | comma-separated portal properties to file, e.g. `Lexington,Breckenridge Village` |
 | `HEADLESS` | `true` | `false` to watch the token step |
 | `EXPORT_FORMS` | `true` | `false` attaches only the summary page |
 
-Output: `output/results.json` (every property, its status and reason, plus any
-unmapped sites) and `output/pdfs/<month>/`. CI keeps both as a run artifact
+Output: `output/results-<month>.json` (every property, its status and reason,
+plus any unmapped sites), `output/results.json` (totals for the run) and
+`output/pdfs/<month>/`.
+
+## Started from the portal
+
+**Run Scraper** and **Test Mappings** in the portal start this workflow through
+the GitHub API (`workflow_dispatch` with `run_id`, `start_month`, `end_month`,
+`only`). The scraper then reports its progress to the portal
+(`scraper.begin` / `scraper.progress`, same `INGEST_TOKEN`), which the
+**Scrape Activity** panel shows. The scheduled run on the 22nd reports the same
+way and appears as "Scheduled run". Progress reporting never stops a scrape:
+if the portal is unreachable, results are still filed. CI keeps both as a run artifact
 for 90 days.
 
 ## Keeping the mappings current
 
 - **`site-map.json`**: MyLoneWorkers site name → portal property. Sites not
   listed are matched by name automatically. Of the 44 MyLoneWorkers clients
-  (Sept 2026), 38 match a portal property; Central Apts, Village Green Apts,
-  Riverchase Apts, Anaheim Apts and Virgina Walnut do not yet. Anything that still cannot be
+  (Sept 2026), 39 match a portal property; Central Apts, Village Green Apts,
+  Riverchase Apts and Virgina Walnut do not yet. Anything that still cannot be
   matched is printed at the end of the run and listed under `unmatchedSites`;
   add it here.
 - **`workers.json` / `property-map.json`**: which login belongs to which
   property. Used only to explain failures ("this login scanned elsewhere",
   "tour with no scans"), never to award a pass.
-- **`portal-properties.json`**: mirror of `REGIONS` in
-  `client/src/pages/Home.tsx`; a test fails if they drift apart.
+- **`portal-properties.json`**: mirror of `REGIONS`, `NOT_ON_MYLONEWORKERS`
+  and `LEGACY_PROPERTY_NAMES` in `shared/properties.ts`; a test fails if they
+  drift apart. The old short names ("Thibodaux", "Star") are kept as
+  `aliases` so MyLoneWorkers site names still match.

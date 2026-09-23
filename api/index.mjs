@@ -10,6 +10,131 @@ var UNAUTHED_ERR_MSG = "Please login (10001)";
 var NOT_ADMIN_ERR_MSG = "You do not have required permission (10002)";
 
 // server/routers.ts
+import { TRPCError as TRPCError3 } from "@trpc/server";
+
+// shared/properties.ts
+var REGIONS = [
+  { name: "Region 1", properties: ["Arbor Crest", "Boca Ciega", "Coral Village", "Jefferson Arms Apts", "Macedonia Garden Apts", "Opa Lock 135th St Apts", "River Pointe", "Silver Springs", "Thomasville"] },
+  { name: "Region 2", properties: ["Breckenridge Village", "Crossroads", "Cumberland Apts", "Grace Townhomes", "Grove Park Terrace", "Holiday Apts", "La Promesa", "Lexington", "Walnut Hill"] },
+  { name: "Region 3", properties: ["Bayou Pointe", "The Gates on Manhattan", "Howell Place", "Marrero 3", "North Pointe", "Pelican Bay", "Pirates Bend", "Ruby Diamond", "St. Charles", "Star Homes", "Thibodaux Colonial Estates", "Windsor / Yorkshire"] },
+  { name: "Region 4", properties: ["Anaheim Apts", "Columbia Village Apts", "Fairfax", "Forest View", "Granite Ridge", "Midtown Manor", "Oak Hills", "Pacific Pointe Apts", "River Garden", "Central Apts / Urban Rehab", "New Wilmington Arms"] }
+];
+var TOTAL_PROPERTIES = REGIONS.reduce((n, r) => n + r.properties.length, 0);
+var NOT_ON_MYLONEWORKERS = ["Fairfax", "Central Apts / Urban Rehab"];
+var LEGACY_PROPERTY_NAMES = {
+  "Jefferson": "Jefferson Arms Apts",
+  "Macedonia": "Macedonia Garden Apts",
+  "Opa Locka": "Opa Lock 135th St Apts",
+  "Breckenridge": "Breckenridge Village",
+  "Cumberland": "Cumberland Apts",
+  "Grove Park": "Grove Park Terrace",
+  "Holiday": "Holiday Apts",
+  "Gates of Manhattan": "The Gates on Manhattan",
+  "Marrero": "Marrero 3",
+  "Star": "Star Homes",
+  "Thibodaux": "Thibodaux Colonial Estates",
+  "Anaheim Gardens": "Anaheim Apts",
+  "Columbia": "Columbia Village Apts",
+  "Midtown": "Midtown Manor",
+  "Pacific": "Pacific Pointe Apts",
+  "Urban": "Central Apts / Urban Rehab",
+  "Wilmington": "New Wilmington Arms"
+};
+var REGIONAL_MANAGERS = {
+  "Region 1": { regionalManager: "JR Rolon", regionalEmail: "jrrolon@apartmentcorp.com" },
+  "Region 2": { regionalManager: "Leslie Rolon", regionalEmail: "leslie@apartmentcorp.com" },
+  "Region 3": { regionalManager: "Ginger Positerry", regionalEmail: "ginger@apartmentcorp.com" },
+  "Region 4": { regionalManager: "Blake Weddington", regionalEmail: "blake@apartmentcorp.com" },
+  "Region 5": { regionalManager: "Johann Armstead", regionalEmail: "johann@apartmentcorp.com" }
+};
+var c = (property, manager, email, ext, region) => ({
+  property,
+  manager,
+  email,
+  ext,
+  region,
+  ...REGIONAL_MANAGERS[region]
+});
+var CONTACTS = [
+  c("Arbor Crest", "Erica Finch", "arborcrest@apartmentcorp.com", "261", "Region 1"),
+  c("Boca Ciega", "Katrina Weekly", "katrina@apartmentcorp.com", "216", "Region 1"),
+  c("Coral Village", "Keyla Maranon", "coralvillage@apartmentcorp.com", "251", "Region 1"),
+  c("Jefferson Arms Apts", "Brandy Amador", "jefferson@apartmentcorp.com", "236", "Region 1"),
+  c("Macedonia Garden Apts", "Erika Scales", "macedonia@apartmentcorp.com", "222", "Region 1"),
+  c("Opa Lock 135th St Apts", "Rosa Villarroel", "opa@apartmentcorp.com", "221", "Region 1"),
+  c("River Pointe", "Stephanie Delong", "stephanie@apartmentcorp.com", "224", "Region 4"),
+  c("Silver Springs", "Tarshia Pierce", "silversprings@apartmentcorp.com", "245", "Region 5"),
+  c("Thomasville", "Adrienne McCall", "thomasville@apartmentcorp.com", "295", "Region 5"),
+  c("Breckenridge Village", "", "lexingtonasst@apartmentcorp.com", "238", "Region 2"),
+  c("Crossroads", "Jennifer Parks", "crossroads@apartmentcorp.com", "273", "Region 2"),
+  c("Cumberland Apts", "Kiara Brown", "cumberland@apartmentcorp.com", "219", "Region 1"),
+  c("Grace Townhomes", "Susan Lopez", "susan@apartmentcorp.com", "227", "Region 2"),
+  c("Grove Park Terrace", "Nikki Moreno", "grovepark@apartmentcorp.com", "265", "Region 2"),
+  c("Holiday Apts", "Arlene Vinson", "holiday@apartmentcorp.com", "235", "Region 1"),
+  c("La Promesa", "Ashley Clay", "lapromesa@apartmentcorp.com", "269", "Region 2"),
+  c("Lexington", "", "lexingtonasst@apartmentcorp.com", "239", "Region 2"),
+  c("Walnut Hill", "", "walnut@apartmentcorp.com", "267", "Region 5"),
+  c("Bayou Pointe", "", "bayou@apartmentcorp.com", "298", "Region 3"),
+  c("The Gates on Manhattan", "Lindgret Celestine", "lindgret@apartmentcorp.com", "284", "Region 3"),
+  c("Howell Place", "Valencia Patterson", "howell@apartmentcorp.com", "259", "Region 3"),
+  c("Marrero 3", "Ketorah Parks", "rubystarmanager@apartmentcorp.com", "283", "Region 3"),
+  c("North Pointe", "", "northpointe@apartmentcorp.com", "297", "Region 3"),
+  c("Pelican Bay", "Dequanta Sutherland", "pelican@apartmentcorp.com", "257", "Region 3"),
+  c("Pirates Bend", "Valencia Patterson", "pirates@apartmentcorp.com", "260", "Region 3"),
+  c("Ruby Diamond", "Ketorah Parks", "rubystarmanager@apartmentcorp.com", "286", "Region 3"),
+  c("St. Charles", "Deon Tolliver", "stcharles@apartmentcorp.com", "255", "Region 3"),
+  c("Star Homes", "Ketorah Parks", "rubystarmanager@apartmentcorp.com", "286", "Region 3"),
+  c("Thibodaux Colonial Estates", "Susie Rogers", "colonialleasing@apartmentcorp.com", "228/229", "Region 3"),
+  c("Windsor / Yorkshire", "Kimberly Powell", "windsor@apartmentcorp.com", "291", "Region 3"),
+  c("Anaheim Apts", "Priscilla Walters", "priscilla@apartmentcorp.com", "212", "Region 4"),
+  c("Columbia Village Apts", "Tammy Davis", "tammy@apartmentcorp.com", "275", "Region 4"),
+  c("Fairfax", "Shraga Kurs", "", "", "Region 4"),
+  c("Forest View", "Tammy / Heather", "tammy@apartmentcorp.com", "277", "Region 4"),
+  c("Granite Ridge", "James Abeyta", "james@apartmentcorp.com", "242", "Region 4"),
+  c("Midtown Manor", "Steve Rand", "", "", "Region 4"),
+  c("Oak Hills", "Heather Hein", "heatherh@apartmentcorp.com", "279", "Region 4"),
+  c("Pacific Pointe Apts", "Hailey Huber", "pacificpointe@apartmentcorp.com", "243", "Region 4"),
+  c("River Garden", "Heather Snyder", "rivergarden@apartmentcorp.com", "252", "Region 4"),
+  c("Central Apts / Urban Rehab", "Amunique Cannon", "", "", "Region 4"),
+  c("New Wilmington Arms", "Jose Gomez", "wilmington@apartmentcorp.com", "211", "Region 4")
+];
+var CONTACT_BY_PROPERTY = Object.fromEntries(CONTACTS.map((x) => [x.property, x]));
+var REMINDER_CC = ["mam@22.bz", "Robert@ApartmentCorp.com", "Todd@menowitz.com", "Ethan@apartmentcorp.com"];
+var REGIONAL_OVERRIDES = {
+  "Region 1": { regionalManager: "JR Rolon", greeting: "JR & Leslie", to: "jrrolon@apartmentcorp.com", cc: ["leslie@apartmentcorp.com", ...REMINDER_CC] }
+};
+var DEFAULT_NAMING = {
+  runTemplate: "Scraper Run \u2014 {start} to {end}",
+  summaryPdfTemplate: "Inspection-Summary-{month}",
+  comparePdfTemplate: "Comparison-{previous}-vs-{month}"
+};
+var MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+function monthLabelOf(monthKey) {
+  const [y, m] = monthKey.split("-").map(Number);
+  return Number.isFinite(y) && m >= 1 && m <= 12 ? `${MONTH_NAMES[m - 1]} ${y}` : monthKey;
+}
+function applyNamingTemplate(template, values, fallback = DEFAULT_NAMING.runTemplate) {
+  const map = {
+    "{month}": values.month,
+    "{previous}": values.previous,
+    "{start}": values.start,
+    "{end}": values.end,
+    "{count}": String(values.count)
+  };
+  return Object.entries(map).reduce((s, [k, v]) => s.split(k).join(v), template.trim() || fallback);
+}
+function monthRange(startKey, endKey) {
+  const [sy, sm] = startKey.split("-").map(Number);
+  const [ey, em] = endKey.split("-").map(Number);
+  const out = [];
+  for (let y = sy, m = sm; y * 12 + m <= ey * 12 + em; m === 12 ? (y++, m = 1) : m++) {
+    out.push(`${y}-${String(m).padStart(2, "0")}`);
+    if (out.length > 120) break;
+  }
+  return out;
+}
+
+// server/routers.ts
 import { z as z2 } from "zod";
 
 // server/_core/cookies.ts
@@ -206,7 +331,7 @@ var systemRouter = router({
 });
 
 // server/db.ts
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/neon-http";
 
 // drizzle/schema.ts
@@ -247,6 +372,37 @@ var inspectionRecords = pgTable("inspection_records", {
   // object storage key
   pdfSize: integer("pdfSize"),
   pdfUploadedAt: varchar("pdfUploadedAt", { length: 64 }),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdate(() => /* @__PURE__ */ new Date())
+});
+var scrapeRuns = pgTable("scrape_runs", {
+  id: serial("id").primaryKey(),
+  label: varchar("label", { length: 255 }).notNull(),
+  kind: varchar("kind", { length: 16 }).default("range").notNull(),
+  // range | test | scheduled
+  status: varchar("status", { length: 32 }).default("queued").notNull(),
+  // queued | running | completed | completed_with_errors | failed
+  startMonthKey: varchar("startMonthKey", { length: 7 }).notNull(),
+  endMonthKey: varchar("endMonthKey", { length: 7 }).notNull(),
+  properties: text("properties"),
+  // JSON array for test runs; null = all
+  totalMonths: integer("totalMonths").default(1).notNull(),
+  completedMonths: integer("completedMonths").default(0).notNull(),
+  currentMonthKey: varchar("currentMonthKey", { length: 7 }),
+  currentProperty: varchar("currentProperty", { length: 128 }),
+  progressMessage: text("progressMessage"),
+  passed: integer("passed").default(0).notNull(),
+  failed: integer("failed").default(0).notNull(),
+  total: integer("total").default(0).notNull(),
+  pdfs: integer("pdfs").default(0).notNull(),
+  errorMessage: text("errorMessage"),
+  githubRunUrl: varchar("githubRunUrl", { length: 512 }),
+  startedAt: timestamp("startedAt").defaultNow().notNull(),
+  completedAt: timestamp("completedAt"),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdate(() => /* @__PURE__ */ new Date())
+});
+var appSettings = pgTable("app_settings", {
+  key: varchar("key", { length: 64 }).primaryKey(),
+  value: text("value").notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdate(() => /* @__PURE__ */ new Date())
 });
 
@@ -455,6 +611,109 @@ async function getRepeatOffenders(minConsecutive = 2) {
   );
   return offenders;
 }
+async function createRun(run) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const [row] = await db.insert(scrapeRuns).values({
+    label: run.label,
+    kind: run.kind,
+    status: run.status ?? "queued",
+    startMonthKey: run.startMonthKey,
+    endMonthKey: run.endMonthKey,
+    totalMonths: run.totalMonths,
+    properties: run.properties?.length ? JSON.stringify(run.properties) : null
+  }).returning();
+  return row;
+}
+async function updateRun(id, patch) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const [row] = await db.update(scrapeRuns).set(patch).where(eq(scrapeRuns.id, id)).returning();
+  return row;
+}
+async function getRun(id) {
+  const db = await getDb();
+  if (!db) return void 0;
+  const [row] = await db.select().from(scrapeRuns).where(eq(scrapeRuns.id, id)).limit(1);
+  return row;
+}
+async function listRuns(limit = 50) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(scrapeRuns).orderBy(desc(scrapeRuns.startedAt)).limit(limit);
+}
+async function listSavedRuns() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(scrapeRuns).where(inArray(scrapeRuns.status, ["completed", "completed_with_errors"])).orderBy(desc(scrapeRuns.startedAt));
+}
+async function deleteRun(id) {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(scrapeRuns).where(eq(scrapeRuns.id, id));
+}
+async function getSetting(key) {
+  const db = await getDb();
+  if (!db) return null;
+  const [row] = await db.select().from(appSettings).where(eq(appSettings.key, key)).limit(1);
+  if (!row) return null;
+  try {
+    return JSON.parse(row.value);
+  } catch {
+    return null;
+  }
+}
+async function setSetting(key, value) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const json = JSON.stringify(value);
+  await db.insert(appSettings).values({ key, value: json }).onConflictDoUpdate({ target: appSettings.key, set: { value: json, updatedAt: /* @__PURE__ */ new Date() } });
+}
+
+// server/github.ts
+var GITHUB_DEFAULTS = {
+  repository: "BrandonRose2/monthly-inspections",
+  workflow: "scrape-inspections.yml",
+  ref: "main"
+};
+var DispatchError = class extends Error {
+};
+async function dispatchScrape(inputs, fetchImpl = fetch) {
+  const token = process.env.GITHUB_TOKEN;
+  if (!token) {
+    throw new DispatchError(
+      "The portal can't start the scraper yet: GITHUB_TOKEN is not set on Railway. Add a GitHub token with Actions read/write access to this repo."
+    );
+  }
+  const repo = process.env.GITHUB_REPOSITORY || GITHUB_DEFAULTS.repository;
+  const workflow = process.env.GITHUB_WORKFLOW_FILE || GITHUB_DEFAULTS.workflow;
+  const ref = process.env.GITHUB_WORKFLOW_REF || GITHUB_DEFAULTS.ref;
+  const res = await fetchImpl(`https://api.github.com/repos/${repo}/actions/workflows/${workflow}/dispatches`, {
+    method: "POST",
+    headers: {
+      accept: "application/vnd.github+json",
+      authorization: `Bearer ${token}`,
+      "x-github-api-version": "2022-11-28",
+      "content-type": "application/json",
+      "user-agent": "monthly-inspections-portal"
+    },
+    body: JSON.stringify({
+      ref,
+      inputs: {
+        run_id: String(inputs.runId),
+        start_month: inputs.startMonthKey,
+        end_month: inputs.endMonthKey,
+        only: (inputs.only ?? []).join(","),
+        dry_run: false
+      }
+    })
+  });
+  if (!res.ok) {
+    const text2 = await res.text().catch(() => "");
+    const hint = res.status === 401 ? " (the token is invalid or expired)" : res.status === 403 || res.status === 404 ? " (the token needs Actions read/write access to " + repo + ")" : res.status === 422 ? " (the workflow on GitHub is missing the run_id/start_month/end_month inputs \u2014 push the updated workflow file)" : "";
+    throw new DispatchError(`GitHub refused to start the scraper: ${res.status}${hint}. ${text2.slice(0, 200)}`.trim());
+  }
+}
 
 // server/storage.ts
 import { randomBytes } from "crypto";
@@ -530,6 +789,20 @@ async function storageRead(key) {
 }
 
 // server/routers.ts
+var monthKeySchema = z2.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/);
+function currentMonthKey(now = /* @__PURE__ */ new Date()) {
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles", year: "numeric", month: "2-digit" }).formatToParts(now);
+  return `${parts.find((p) => p.type === "year").value}-${parts.find((p) => p.type === "month").value}`;
+}
+function previousMonthKey(key) {
+  const [y, m] = key.split("-").map(Number);
+  return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, "0")}`;
+}
+var STALE_AFTER_MS = 90 * 60 * 1e3;
+function withStaleStatus(run, now = Date.now()) {
+  const active = run.status === "queued" || run.status === "running";
+  return active && now - new Date(run.updatedAt).getTime() > STALE_AFTER_MS ? { ...run, status: "stalled" } : run;
+}
 var appRouter = router({
   // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
   system: systemRouter,
@@ -746,6 +1019,115 @@ var appRouter = router({
         }
       }
       return { success: true, imported, pdfUploaded };
+    })
+  }),
+  settings: router({
+    naming: publicProcedure.query(async () => ({ ...DEFAULT_NAMING, ...await getSetting("naming") ?? {} })),
+    setNaming: publicProcedure.input(z2.object({
+      runTemplate: z2.string().trim().min(1).max(200),
+      summaryPdfTemplate: z2.string().trim().min(1).max(200),
+      comparePdfTemplate: z2.string().trim().min(1).max(200)
+    })).mutation(async ({ input }) => {
+      await setSetting("naming", input);
+      return input;
+    })
+  }),
+  scraper: router({
+    // Latest runs for the Scrape Activity panel.
+    activity: publicProcedure.query(async () => (await listRuns(20)).map((r) => withStaleStatus(r))),
+    // Finished runs, for the Saved Runs list.
+    savedRuns: publicProcedure.query(async () => listSavedRuns()),
+    start: publicProcedure.input(z2.object({
+      startMonthKey: monthKeySchema,
+      endMonthKey: monthKeySchema,
+      properties: z2.array(z2.string()).max(60).optional()
+    })).mutation(async ({ input }) => {
+      const months = monthRange(input.startMonthKey, input.endMonthKey);
+      if (!months.length) throw new TRPCError3({ code: "BAD_REQUEST", message: "End month must be on or after the start month." });
+      if (months.length > 36) throw new TRPCError3({ code: "BAD_REQUEST", message: "Pick 36 months or fewer." });
+      if (input.endMonthKey > currentMonthKey()) {
+        throw new TRPCError3({ code: "BAD_REQUEST", message: "The range can't include future months." });
+      }
+      const known = new Set(REGIONS.flatMap((r) => r.properties));
+      const properties = input.properties?.length ? Array.from(new Set(input.properties)) : null;
+      for (const p of properties ?? []) {
+        if (!known.has(p)) throw new TRPCError3({ code: "BAD_REQUEST", message: `Unknown property: ${p}` });
+        if (NOT_ON_MYLONEWORKERS.includes(p)) throw new TRPCError3({ code: "BAD_REQUEST", message: `${p} is not connected to MyLoneWorkers.` });
+      }
+      const active = (await listRuns(10)).map((r) => withStaleStatus(r)).find((r) => r.status === "queued" || r.status === "running");
+      if (active) throw new TRPCError3({ code: "CONFLICT", message: `"${active.label}" is still ${active.status}. Wait for it to finish before starting another.` });
+      const naming = { ...DEFAULT_NAMING, ...await getSetting("naming") ?? {} };
+      const label = properties ? `Test scrape \u2014 ${properties.join(" & ")}` : applyNamingTemplate(naming.runTemplate, {
+        month: monthLabelOf(input.endMonthKey),
+        previous: monthLabelOf(previousMonthKey(input.startMonthKey)),
+        start: monthLabelOf(input.startMonthKey),
+        end: monthLabelOf(input.endMonthKey),
+        count: months.length
+      });
+      const run = await createRun({
+        label: label.slice(0, 255),
+        kind: properties ? "test" : "range",
+        startMonthKey: input.startMonthKey,
+        endMonthKey: input.endMonthKey,
+        totalMonths: months.length,
+        properties,
+        status: "queued"
+      });
+      try {
+        await dispatchScrape({ runId: run.id, startMonthKey: input.startMonthKey, endMonthKey: input.endMonthKey, only: properties ?? void 0 });
+      } catch (err) {
+        const message = err instanceof DispatchError ? err.message : `Could not reach GitHub: ${err.message}`;
+        await updateRun(run.id, { status: "failed", errorMessage: message, completedAt: /* @__PURE__ */ new Date() });
+        throw new TRPCError3({ code: "PRECONDITION_FAILED", message });
+      }
+      return await updateRun(run.id, { progressMessage: "Waiting for the Mac runner to pick up the job\u2026" }) ?? run;
+    }),
+    rename: publicProcedure.input(z2.object({ id: z2.number().int(), label: z2.string().trim().min(1).max(255) })).mutation(async ({ input }) => updateRun(input.id, { label: input.label })),
+    remove: publicProcedure.input(z2.object({ id: z2.number().int() })).mutation(async ({ input }) => {
+      await deleteRun(input.id);
+      return { success: true };
+    }),
+    // Called by the scraper when it starts. Portal-started runs pass their
+    // runId; scheduled runs get a new row.
+    begin: machineProcedure.input(z2.object({
+      runId: z2.number().int().optional(),
+      startMonthKey: monthKeySchema,
+      endMonthKey: monthKeySchema,
+      properties: z2.array(z2.string()).optional(),
+      githubRunUrl: z2.string().max(512).optional()
+    })).mutation(async ({ input }) => {
+      const totalMonths = monthRange(input.startMonthKey, input.endMonthKey).length;
+      const existing = input.runId ? await getRun(input.runId) : void 0;
+      const run = existing ? await updateRun(existing.id, { status: "running", githubRunUrl: input.githubRunUrl ?? null, progressMessage: "Signing in to MyLoneWorkers\u2026", errorMessage: null }) : await createRun({
+        label: input.properties?.length ? `Test scrape \u2014 ${input.properties.join(" & ")}` : `Scheduled run \u2014 ${monthLabelOf(input.startMonthKey)}${totalMonths > 1 ? ` to ${monthLabelOf(input.endMonthKey)}` : ""}`,
+        kind: input.properties?.length ? "test" : "scheduled",
+        startMonthKey: input.startMonthKey,
+        endMonthKey: input.endMonthKey,
+        totalMonths,
+        properties: input.properties,
+        status: "running"
+      }).then((r) => input.githubRunUrl ? updateRun(r.id, { githubRunUrl: input.githubRunUrl }) : r);
+      if (!run) throw new TRPCError3({ code: "NOT_FOUND", message: "Run not found" });
+      return { id: run.id };
+    }),
+    progress: machineProcedure.input(z2.object({
+      id: z2.number().int(),
+      status: z2.enum(["running", "completed", "completed_with_errors", "failed"]).optional(),
+      completedMonths: z2.number().int().min(0).optional(),
+      currentMonthKey: monthKeySchema.nullable().optional(),
+      currentProperty: z2.string().max(128).nullable().optional(),
+      progressMessage: z2.string().max(2e3).nullable().optional(),
+      passed: z2.number().int().min(0).optional(),
+      failed: z2.number().int().min(0).optional(),
+      total: z2.number().int().min(0).optional(),
+      pdfs: z2.number().int().min(0).optional(),
+      errorMessage: z2.string().max(4e3).nullable().optional()
+    })).mutation(async ({ input }) => {
+      const { id, ...patch } = input;
+      const done = patch.status && patch.status !== "running";
+      const run = await updateRun(id, { ...patch, ...done ? { completedAt: /* @__PURE__ */ new Date() } : {} });
+      if (!run) throw new TRPCError3({ code: "NOT_FOUND", message: "Run not found" });
+      return { success: true };
     })
   })
 });
@@ -1096,7 +1478,62 @@ function registerStorageProxy(app2) {
   });
 }
 
+// server/schema-setup.ts
+import { sql } from "drizzle-orm";
+var SCHEMA_STATEMENTS = [
+  sql`CREATE TABLE IF NOT EXISTS "scrape_runs" (
+    "id" serial PRIMARY KEY NOT NULL,
+    "label" varchar(255) NOT NULL,
+    "kind" varchar(16) DEFAULT 'range' NOT NULL,
+    "status" varchar(32) DEFAULT 'queued' NOT NULL,
+    "startMonthKey" varchar(7) NOT NULL,
+    "endMonthKey" varchar(7) NOT NULL,
+    "properties" text,
+    "totalMonths" integer DEFAULT 1 NOT NULL,
+    "completedMonths" integer DEFAULT 0 NOT NULL,
+    "currentMonthKey" varchar(7),
+    "currentProperty" varchar(128),
+    "progressMessage" text,
+    "passed" integer DEFAULT 0 NOT NULL,
+    "failed" integer DEFAULT 0 NOT NULL,
+    "total" integer DEFAULT 0 NOT NULL,
+    "pdfs" integer DEFAULT 0 NOT NULL,
+    "errorMessage" text,
+    "githubRunUrl" varchar(512),
+    "startedAt" timestamp DEFAULT now() NOT NULL,
+    "completedAt" timestamp,
+    "updatedAt" timestamp DEFAULT now() NOT NULL
+  )`,
+  sql`CREATE TABLE IF NOT EXISTS "app_settings" (
+    "key" varchar(64) PRIMARY KEY NOT NULL,
+    "value" text NOT NULL,
+    "updatedAt" timestamp DEFAULT now() NOT NULL
+  )`
+];
+function renameStatements() {
+  return Object.entries(LEGACY_PROPERTY_NAMES).map(
+    ([from, to]) => sql`UPDATE "inspection_records" AS r SET "property" = ${to}
+      WHERE r."property" = ${from}
+        AND NOT EXISTS (
+          SELECT 1 FROM "inspection_records" AS n
+          WHERE n."monthKey" = r."monthKey" AND n."region" = r."region" AND n."property" = ${to}
+        )`
+  );
+}
+async function ensureSchema() {
+  const db = await getDb();
+  if (!db) return;
+  try {
+    for (const s of SCHEMA_STATEMENTS) await db.execute(s);
+    for (const s of renameStatements()) await db.execute(s);
+    console.log("[Database] schema ready");
+  } catch (err) {
+    console.error("[Database] schema setup failed:", err);
+  }
+}
+
 // server/vercel-entry.ts
+void ensureSchema();
 var app = express();
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));

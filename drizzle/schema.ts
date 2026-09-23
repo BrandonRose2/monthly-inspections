@@ -51,3 +51,37 @@ export const inspectionRecords = pgTable("inspection_records", {
 
 export type InspectionRecord = typeof inspectionRecords.$inferSelect;
 export type InsertInspectionRecord = typeof inspectionRecords.$inferInsert;
+
+// One row per scraper run, whether started from the portal, by the monthly
+// schedule, or as a mapping test. Doubles as the "Saved Runs" list.
+export const scrapeRuns = pgTable("scrape_runs", {
+  id: serial("id").primaryKey(),
+  label: varchar("label", { length: 255 }).notNull(),
+  kind: varchar("kind", { length: 16 }).default("range").notNull(), // range | test | scheduled
+  status: varchar("status", { length: 32 }).default("queued").notNull(), // queued | running | completed | completed_with_errors | failed
+  startMonthKey: varchar("startMonthKey", { length: 7 }).notNull(),
+  endMonthKey: varchar("endMonthKey", { length: 7 }).notNull(),
+  properties: text("properties"), // JSON array for test runs; null = all
+  totalMonths: integer("totalMonths").default(1).notNull(),
+  completedMonths: integer("completedMonths").default(0).notNull(),
+  currentMonthKey: varchar("currentMonthKey", { length: 7 }),
+  currentProperty: varchar("currentProperty", { length: 128 }),
+  progressMessage: text("progressMessage"),
+  passed: integer("passed").default(0).notNull(),
+  failed: integer("failed").default(0).notNull(),
+  total: integer("total").default(0).notNull(),
+  pdfs: integer("pdfs").default(0).notNull(),
+  errorMessage: text("errorMessage"),
+  githubRunUrl: varchar("githubRunUrl", { length: 512 }),
+  startedAt: timestamp("startedAt").defaultNow().notNull(),
+  completedAt: timestamp("completedAt"),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdate(() => new Date()),
+});
+
+export type ScrapeRun = typeof scrapeRuns.$inferSelect;
+
+export const appSettings = pgTable("app_settings", {
+  key: varchar("key", { length: 64 }).primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdate(() => new Date()),
+});

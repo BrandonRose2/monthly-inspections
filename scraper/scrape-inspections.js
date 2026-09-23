@@ -22,6 +22,8 @@
  *
  * Options (environment variables):
  *   MONTH=YYYY-MM     month to process (default: current month in TIME_ZONE)
+ *   START_MONTH / END_MONTH=YYYY-MM   process a range instead (inclusive)
+ *   RUN_ID=12         the portal run this scrape reports progress to
  *   DRY_RUN=true      write output/ but file nothing into the portal
  *   MIN_UNITS=3       units needed for a pass; fewer is "partial"
  *   DUE_DAY=21        deadline day of month
@@ -32,11 +34,12 @@
  */
 const fs = require('fs');
 const path = require('path');
-const { monthWindows, currentMonthKey } = require('./lib/time');
+const { monthWindows, currentMonthKey, monthRange } = require('./lib/time');
 const { fetchAllEvents, fetchFormsPdfs, SessionExpiredError } = require('./lib/mlw-api');
 const { attribute } = require('./lib/attribute');
 const { buildReportPdf } = require('./lib/report-pdf');
 const { mergePdfs } = require('./lib/pdf-merge');
+const { makeReporter } = require('./lib/progress');
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
@@ -90,25 +93,41 @@ async function fileResult({ monthKey, result, pdf }) {
   if (!res.ok || body.includes('"error"')) throw new Error(`portal ingest failed (${res.status}): ${body.slice(0, 300)}`);
 }
 
-async function run() {
-  if (!CONFIG.dryRun && (!CONFIG.portalBaseUrl || !CONFIG.ingestToken)) {
-    throw new Error('PORTAL_BASE_URL and INGEST_TOKEN are required (or set DRY_RUN=true)');
-  }
-  const monthKey = (process.env.MONTH || '').trim() || currentMonthKey(CONFIG.timeZone);
+function githubRunUrl() {
+  const { GITHUB_SERVER_URL, GITHUB_REPOSITORY, GITHUB_RUN_ID } = process.env;
+  return GITHUB_SERVER_URL && GITHUB_REPOSITORY && GITHUB_RUN_ID
+    ? `${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}`
+    : undefined;
+}
+
+function monthsToRun() {
+  const single = (process.env.MONTH || '').trim();
+  const start = (process.env.START_MONTH || '').trim() || single || currentMonthKey(CONFIG.timeZone);
+  const end = (process.env.END_MONTH || '').trim() || start;
+  const months = monthRange(start, end);
+  if (!months.length) throw new Error(`END_MONTH (${end}) is before START_MONTH (${start})`);
+  return months;
+}
+
+const reporter = makeReporter({
+  portalBaseUrl: CONFIG.portalBaseUrl,
+  ingestToken: CONFIG.ingestToken,
+  enabled: !CONFIG.dryRun && Boolean(CONFIG.portalBaseUrl && CONFIG.ingestToken),
+});
+
+// Running totals across every month of the run, shown in Scrape Activity.
+const totals = { passed: 0, failed: 0, total: 0, pdfs: 0, errors: 0 };
+
+async function runMonth({ monthKey, index, count, token, portal, siteMap, workers, propertyMap, guardIds }) {
   const windows = monthWindows(monthKey, { timeZone: CONFIG.timeZone, dueDay: CONFIG.dueDay });
   const [y, m] = monthKey.split('-').map(Number);
   const monthLabel = `${MONTHS[m - 1]} ${y}`;
+  const step = count > 1 ? ` (${index + 1} of ${count})` : '';
 
-  const portal = readJson('portal-properties.json');
-  const siteMap = readJson('site-map.json');
-  const workers = readJson('workers.json');
-  const propertyMap = loadPropertyMap();
-  const guardIds = workers.workers.map(w => w.id);
-
-  console.log(`\nMonthly Inspections — ${monthLabel}${CONFIG.dryRun ? ' (DRY RUN)' : ''}`);
+  console.log(`\nMonthly Inspections — ${monthLabel}${step}${CONFIG.dryRun ? ' (DRY RUN)' : ''}`);
   console.log(`Deadline: day ${CONFIG.dueDay} of the month, ${CONFIG.timeZone}; pass = at least ${CONFIG.minUnits} units scanned`);
+  await reporter.update({ currentMonthKey: monthKey, currentProperty: null, progressMessage: `Fetching ${monthLabel} from MyLoneWorkers${step}` });
 
-  const token = await borrowToken();
   const to = Math.min(windows.monthEnd, Math.floor(Date.now() / 1000));
   const events = await fetchAllEvents(token, { guardIds, from: windows.start, to });
   console.log(`Fetched ${events.length} events from MyLoneWorkers`);
@@ -129,6 +148,7 @@ async function run() {
       summary.push({ ...r, scans: undefined, tourEvents: undefined, filed: false });
       continue;
     }
+    await reporter.update({ currentProperty: r.property, progressMessage: `${monthLabel}${step}: filing ${r.property}` });
     try {
       let pdf = null;
       let formsPages = 0;
@@ -153,6 +173,10 @@ async function run() {
       }
       if (!CONFIG.dryRun) await fileResult({ monthKey, result: r, pdf });
       filed++;
+      totals.total++;
+      if (r.checked) totals.passed++;
+      if (r.xed) totals.failed++;
+      if (pdf) totals.pdfs++;
       console.log(`  ${CONFIG.dryRun ? 'dry ' : 'filed'} ${line}${formsPages ? ` [+${formsPages} form pages]` : ''}`);
       summary.push({ region: r.region, property: r.property, status: r.status, checked: r.checked, xed: r.xed,
         note: r.note, units: r.units, onTimeUnits: r.onTimeUnits, inspectors: r.inspectors, pdf: pdf?.fileName ?? null, formsPages,
@@ -160,9 +184,11 @@ async function run() {
     } catch (err) {
       if (err instanceof SessionExpiredError) throw err;
       failed++;
+      totals.errors++;
       console.warn(`  FAIL  ${line}\n        ${err.message}`);
       summary.push({ region: r.region, property: r.property, status: r.status, error: err.message, filed: false });
     }
+    await reporter.update({ passed: totals.passed, failed: totals.failed, total: totals.total, pdfs: totals.pdfs });
   }
 
   if (unmatchedSites.length) {
@@ -174,21 +200,67 @@ async function run() {
   }
 
   const counts = summary.reduce((acc, r) => ((acc[r.status] = (acc[r.status] || 0) + 1), acc), {});
-  fs.writeFileSync(path.join(CONFIG.outputDir, 'results.json'), JSON.stringify({
+  const monthResult = {
     monthKey, generatedAt: new Date().toISOString(), dryRun: CONFIG.dryRun, minUnits: CONFIG.minUnits,
     eventsFetched: events.length, counts, filed, failed, unmatchedSites, unknownWorkers, results: summary,
-  }, null, 2));
-
-  console.log(`\nDone — ${Object.entries(counts).map(([k, v]) => `${v} ${k}`).join(', ')}. Filed ${filed}, failed ${failed}.`);
-  console.log('Details: scraper/output/results.json; PDFs: scraper/output/pdfs/');
-  if (failed) process.exitCode = 1;
+  };
+  fs.writeFileSync(path.join(CONFIG.outputDir, `results-${monthKey}.json`), JSON.stringify(monthResult, null, 2));
+  console.log(`\n${monthLabel} done — ${Object.entries(counts).map(([k, v]) => `${v} ${k}`).join(', ')}. Filed ${filed}, failed ${failed}.`);
+  await reporter.update({ completedMonths: index + 1 });
+  return monthResult;
 }
 
-run().catch(err => {
-  if (err instanceof SessionExpiredError) {
-    console.error(`\n${err.message}. Run \`npm run setup:session\` on the runner and sign in again.`);
-  } else {
-    console.error(`\nFatal: ${err.message}`);
+async function run() {
+  if (!CONFIG.dryRun && (!CONFIG.portalBaseUrl || !CONFIG.ingestToken)) {
+    throw new Error('PORTAL_BASE_URL and INGEST_TOKEN are required (or set DRY_RUN=true)');
   }
+  const months = monthsToRun();
+  const runId = Number(process.env.RUN_ID) || undefined;
+  await reporter.begin({
+    runId,
+    startMonthKey: months[0],
+    endMonthKey: months[months.length - 1],
+    properties: CONFIG.only.length ? CONFIG.only : undefined,
+    githubRunUrl: githubRunUrl(),
+  });
+
+  const portal = readJson('portal-properties.json');
+  const siteMap = readJson('site-map.json');
+  const workers = readJson('workers.json');
+  const propertyMap = loadPropertyMap();
+  const guardIds = workers.workers.map(w => w.id);
+  fs.mkdirSync(CONFIG.outputDir, { recursive: true });
+
+  const token = await borrowToken();
+  const monthResults = [];
+  for (const [index, monthKey] of months.entries()) {
+    monthResults.push(await runMonth({ monthKey, index, count: months.length, token, portal, siteMap, workers, propertyMap, guardIds }));
+  }
+
+  fs.writeFileSync(path.join(CONFIG.outputDir, 'results.json'), JSON.stringify({
+    months, generatedAt: new Date().toISOString(), dryRun: CONFIG.dryRun, totals,
+    perMonth: monthResults.map(({ monthKey, counts, filed, failed, unmatchedSites }) => ({ monthKey, counts, filed, failed, unmatchedSites })),
+  }, null, 2));
+
+  const failedAny = totals.errors > 0;
+  await reporter.update({
+    status: failedAny ? 'completed_with_errors' : 'completed',
+    currentProperty: null,
+    completedMonths: months.length,
+    passed: totals.passed, failed: totals.failed, total: totals.total, pdfs: totals.pdfs,
+    progressMessage: `${totals.passed} passed · ${totals.failed} issues · ${totals.pdfs} PDFs${failedAny ? ` · ${totals.errors} could not be filed` : ''}`,
+    ...(failedAny ? { errorMessage: `${totals.errors} propert${totals.errors === 1 ? 'y' : 'ies'} could not be filed; see the GitHub run log.` } : {}),
+  });
+  console.log(`\nAll done — ${months.length} month${months.length === 1 ? '' : 's'}. Details: scraper/output/results*.json; PDFs: scraper/output/pdfs/`);
+  if (failedAny) process.exitCode = 1;
+}
+
+run().catch(async err => {
+  const message = err instanceof SessionExpiredError
+    ? `${err.message}. Run \`npm run setup:session\` on the runner and sign in again.`
+    : err.message;
+  console.error(`\n${err instanceof SessionExpiredError ? '' : 'Fatal: '}${message}`);
+  await reporter.update({ status: 'failed', currentProperty: null, errorMessage: message.slice(0, 4000),
+    passed: totals.passed, failed: totals.failed, total: totals.total, pdfs: totals.pdfs });
   process.exit(1);
 });

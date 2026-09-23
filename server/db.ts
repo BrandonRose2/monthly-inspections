@@ -1,6 +1,6 @@
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/neon-http";
-import { inspectionRecords, InsertInspectionRecord, InsertUser, users } from "../drizzle/schema";
+import { appSettings, inspectionRecords, InsertInspectionRecord, InsertUser, scrapeRuns, ScrapeRun, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -310,4 +310,100 @@ export async function getRepeatOffenders(minConsecutive = 2): Promise<RepeatOffe
   );
 
   return offenders;
+}
+
+// ── Scrape runs ───────────────────────────────────────────────────────────────
+
+export type NewRun = {
+  label: string;
+  kind: "range" | "test" | "scheduled";
+  startMonthKey: string;
+  endMonthKey: string;
+  totalMonths: number;
+  properties?: string[] | null;
+  status?: string;
+};
+
+export async function createRun(run: NewRun): Promise<ScrapeRun> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const [row] = await db
+    .insert(scrapeRuns)
+    .values({
+      label: run.label,
+      kind: run.kind,
+      status: run.status ?? "queued",
+      startMonthKey: run.startMonthKey,
+      endMonthKey: run.endMonthKey,
+      totalMonths: run.totalMonths,
+      properties: run.properties?.length ? JSON.stringify(run.properties) : null,
+    })
+    .returning();
+  return row;
+}
+
+export type RunPatch = Partial<Pick<ScrapeRun,
+  "label" | "status" | "completedMonths" | "currentMonthKey" | "currentProperty" | "progressMessage" |
+  "passed" | "failed" | "total" | "pdfs" | "errorMessage" | "githubRunUrl" | "completedAt">>;
+
+export async function updateRun(id: number, patch: RunPatch): Promise<ScrapeRun | undefined> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const [row] = await db.update(scrapeRuns).set(patch).where(eq(scrapeRuns.id, id)).returning();
+  return row;
+}
+
+export async function getRun(id: number): Promise<ScrapeRun | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  const [row] = await db.select().from(scrapeRuns).where(eq(scrapeRuns.id, id)).limit(1);
+  return row;
+}
+
+export async function listRuns(limit = 50): Promise<ScrapeRun[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(scrapeRuns).orderBy(desc(scrapeRuns.startedAt)).limit(limit);
+}
+
+export const FINISHED_STATUSES = ["completed", "completed_with_errors", "failed"];
+
+export async function listSavedRuns(): Promise<ScrapeRun[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(scrapeRuns)
+    .where(inArray(scrapeRuns.status, ["completed", "completed_with_errors"]))
+    .orderBy(desc(scrapeRuns.startedAt));
+}
+
+export async function deleteRun(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(scrapeRuns).where(eq(scrapeRuns.id, id));
+}
+
+// ── Settings ──────────────────────────────────────────────────────────────────
+
+export async function getSetting<T>(key: string): Promise<T | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const [row] = await db.select().from(appSettings).where(eq(appSettings.key, key)).limit(1);
+  if (!row) return null;
+  try {
+    return JSON.parse(row.value) as T;
+  } catch {
+    return null;
+  }
+}
+
+export async function setSetting(key: string, value: unknown): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const json = JSON.stringify(value);
+  await db
+    .insert(appSettings)
+    .values({ key, value: json })
+    .onConflictDoUpdate({ target: appSettings.key, set: { value: json, updatedAt: new Date() } });
 }

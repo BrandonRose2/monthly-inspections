@@ -22,26 +22,26 @@ function run(events = septemberEvents(), minUnits = 3) {
 
 test('scans are credited to the site where they happened, not the login', () => {
   const { by } = run();
-  assert.equal(by['Breckenridge'].status, 'pass');
-  assert.equal(by['Breckenridge'].units, 8);
-  assert.match(by['Breckenridge'].note, /Grace Townhomes Manager/);
+  assert.equal(by['Breckenridge Village'].status, 'pass');
+  assert.equal(by['Breckenridge Village'].units, 8);
+  assert.match(by['Breckenridge Village'].note, /Grace Townhomes Manager/);
   assert.equal(by['Grace Townhomes'].status, 'pass');
   assert.equal(by['Grace Townhomes'].units, 7);
 });
 
 test("a login that only scanned other properties does not pass its own", () => {
   const { by } = run();
-  assert.equal(by['Star'].status, 'other_sites_only');
-  assert.equal(by['Star'].xed, true);
-  assert.match(by['Star'].note, /Marrero/);
-  assert.match(by['Star'].note, /Ruby Diamond/);
+  assert.equal(by['Star Homes'].status, 'other_sites_only');
+  assert.equal(by['Star Homes'].xed, true);
+  assert.match(by['Star Homes'].note, /Marrero/);
+  assert.match(by['Star Homes'].note, /Ruby Diamond/);
 });
 
 test('one or two units is partial, not a pass', () => {
   const { by } = run();
-  assert.equal(by['Marrero'].status, 'partial');
+  assert.equal(by['Marrero 3'].status, 'partial');
   assert.equal(by['Ruby Diamond'].status, 'partial');
-  assert.equal(by['Marrero'].checked, false);
+  assert.equal(by['Marrero 3'].checked, false);
 });
 
 test('an inspection finished after the 21st is marked late but done', () => {
@@ -54,8 +54,8 @@ test('an inspection finished after the 21st is marked late but done', () => {
 
 test('a tour with no unit scans is flagged with that reason', () => {
   const { by } = run();
-  assert.equal(by['Grove Park'].status, 'tour_no_scans');
-  assert.match(by['Grove Park'].note, /no units were scanned/);
+  assert.equal(by['Grove Park Terrace'].status, 'tour_no_scans');
+  assert.match(by['Grove Park Terrace'].note, /no units were scanned/);
 });
 
 test('normal on-time inspection passes', () => {
@@ -64,7 +64,7 @@ test('normal on-time inspection passes', () => {
   assert.equal(by['River Pointe'].units, 12);
   assert.equal(by['River Pointe'].forms, 5);
   assert.match(by['River Pointe'].note, /5 inspection forms filed/);
-  assert.doesNotMatch(by['Breckenridge'].note, /forms filed/);
+  assert.doesNotMatch(by['Breckenridge Village'].note, /forms filed/);
 });
 
 test('properties with no activity say so, and off-platform ones are skipped', () => {
@@ -90,11 +90,15 @@ test('site names resolve by name when not in the explicit map', () => {
   const resolve = makeSiteResolver({ portal, siteMap });
   const names = c => (resolve(c) || []).map(d => d.property).sort();
   assert.deepEqual(names('Silver Springs Terrace - Silver Springs Terrace'), ['Silver Springs']);
-  assert.deepEqual(names('Gates On Manhattan - Gates On Manhattan'), ['Gates of Manhattan']);
+  assert.deepEqual(names('Gates On Manhattan - Gates On Manhattan'), ['The Gates on Manhattan']);
   assert.deepEqual(names('Windsor Apts - Windsor Apts'), ['Windsor / Yorkshire']);
   assert.deepEqual(names('River Gardens - River Gardens'), ['River Garden']);
   assert.deepEqual(names('North Pointe - Bayou Pointe'), ['Bayou Pointe', 'North Pointe']);
   assert.deepEqual(names('Starbucks - Starbucks'), []);
+  // Earlier short names still match, and new full names match too.
+  assert.deepEqual(names('Thibodaux - Thibodaux'), ['Thibodaux Colonial Estates']);
+  assert.deepEqual(names('Anaheim Apts - Anaheim Apts'), ['Anaheim Apts']);
+  assert.deepEqual(names('Cumberland Apts - Cumberland Apts'), ['Cumberland Apts']);
 });
 
 test('client strings of the form "X - X" collapse to X', () => {

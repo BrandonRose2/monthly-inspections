@@ -71,4 +71,18 @@ function formatLocalDate(epochSeconds, timeZone = 'America/Los_Angeles') {
   return new Date(epochSeconds * 1000).toLocaleDateString('en-US', { timeZone, month: 'numeric', day: 'numeric' });
 }
 
-module.exports = { monthWindows, currentMonthKey, zonedToEpoch, formatLocal, formatLocalDate };
+/** "YYYY-MM" keys from start to end inclusive; [] if end is before start. */
+function monthRange(startKey, endKey) {
+  for (const k of [startKey, endKey]) {
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(k)) throw new Error(`month must look like YYYY-MM, got "${k}"`);
+  }
+  const [sy, sm] = startKey.split('-').map(Number);
+  const [ey, em] = endKey.split('-').map(Number);
+  const out = [];
+  for (let i = sy * 12 + sm - 1; i <= ey * 12 + em - 1 && out.length < 120; i++) {
+    out.push(`${Math.floor(i / 12)}-${String((i % 12) + 1).padStart(2, '0')}`);
+  }
+  return out;
+}
+
+module.exports = { monthWindows, currentMonthKey, monthRange, zonedToEpoch, formatLocal, formatLocalDate };

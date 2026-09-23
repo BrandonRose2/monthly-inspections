@@ -1,18 +1,11 @@
 import { useState, useEffect, useCallback, useRef, DragEvent } from "react";
 import { trpc } from "@/lib/trpc";
-import { Printer, RotateCcw, Mail, X as XIcon, Copy, Check, FileText, Upload, Eye, Trash2, ChevronLeft, ChevronRight, ClipboardList, GitCompare, Download, FolderOpen, History, TrendingUp, TrendingDown, Minus, CheckCircle2, XCircle, FileBarChart2 } from "lucide-react";
+import { Printer, RotateCcw, Mail, X as XIcon, Copy, Check, FileText, Upload, Eye, Trash2, ChevronLeft, ChevronRight, ClipboardList, GitCompare, Download, FolderOpen, History, TrendingUp, TrendingDown, Minus, CheckCircle2, XCircle, FileBarChart2, Play, FlaskConical, Tag, BellRing, Bookmark } from "lucide-react";
+import { applyNamingTemplate, CONTACT_BY_PROPERTY, DEFAULT_NAMING, MONTH_NAMES, NamingSettings, NOT_ON_MYLONEWORKERS, PropertyContact, REGIONS, TOTAL_PROPERTIES } from "@shared/properties";
+import { downloadReportPdf } from "@/lib/reportPdf";
+import { NamingModal, PreDueModal, RunScraperModal, SavedRunsModal, ScrapeActivityPanel, TestMappingsModal, UnmappedBanner, useNaming, useScrapeActivity } from "./ScraperPanels";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-
-interface PropertyContact {
-  property: string;
-  manager: string;
-  email: string;
-  ext: string;
-  region: string;
-  regionalManager: string;
-  regionalEmail: string;
-}
 
 interface PDFAttachment {
   name: string;
@@ -30,63 +23,11 @@ interface PropertyStatus {
 
 type InspectionState = Record<string, PropertyStatus>;
 
-// ─── Contact Data ─────────────────────────────────────────────────────────────
+// ─── Properties & contacts (shared/properties.ts) ─────────────────────────────
 
-const CONTACTS: PropertyContact[] = [
-  { property: "Arbor Crest",         manager: "Erica Finch",           email: "arborcrest@apartmentcorp.com",     ext: "261", region: "Region 1", regionalManager: "JR Rolon",          regionalEmail: "jrrolon@apartmentcorp.com" },
-  { property: "Boca Ciega",          manager: "Katrina Weekly",         email: "katrina@apartmentcorp.com",        ext: "216", region: "Region 1", regionalManager: "JR Rolon",          regionalEmail: "jrrolon@apartmentcorp.com" },
-  { property: "Coral Village",       manager: "Keyla Maranon",          email: "coralvillage@apartmentcorp.com",   ext: "251", region: "Region 1", regionalManager: "JR Rolon",          regionalEmail: "jrrolon@apartmentcorp.com" },
-  { property: "Jefferson",           manager: "Brandy Amador",          email: "jefferson@apartmentcorp.com",      ext: "236", region: "Region 1", regionalManager: "JR Rolon",          regionalEmail: "jrrolon@apartmentcorp.com" },
-  { property: "Macedonia",           manager: "Erika Scales",           email: "macedonia@apartmentcorp.com",      ext: "222", region: "Region 1", regionalManager: "JR Rolon",          regionalEmail: "jrrolon@apartmentcorp.com" },
-  { property: "Opa Locka",           manager: "Rosa Villarroel",        email: "opa@apartmentcorp.com",            ext: "221", region: "Region 1", regionalManager: "JR Rolon",          regionalEmail: "jrrolon@apartmentcorp.com" },
-  { property: "River Pointe",        manager: "Stephanie Delong",       email: "stephanie@apartmentcorp.com",      ext: "224", region: "Region 1", regionalManager: "JR Rolon",          regionalEmail: "jrrolon@apartmentcorp.com" },
-  { property: "Silver Springs",      manager: "Tarshia Pierce",         email: "silversprings@apartmentcorp.com",  ext: "245", region: "Region 1", regionalManager: "Leslie Rolon",      regionalEmail: "leslie@apartmentcorp.com" },
-  { property: "Thomasville",         manager: "Ebony Nelson",           email: "thomasville@apartmentcorp.com",    ext: "295", region: "Region 1", regionalManager: "Leslie Rolon",      regionalEmail: "leslie@apartmentcorp.com" },
-  { property: "Breckenridge",        manager: "Susan Lopez",            email: "susan@apartmentcorp.com",          ext: "227", region: "Region 2", regionalManager: "Leslie Rolon",      regionalEmail: "leslie@apartmentcorp.com" },
-  { property: "Crossroads",          manager: "Jennifer Parks",         email: "crossroads@apartmentcorp.com",     ext: "273", region: "Region 2", regionalManager: "Leslie Rolon",      regionalEmail: "leslie@apartmentcorp.com" },
-  { property: "Cumberland",          manager: "Kiara Brown",            email: "cumberland@apartmentcorp.com",     ext: "219", region: "Region 2", regionalManager: "Leslie Rolon",      regionalEmail: "leslie@apartmentcorp.com" },
-  { property: "Grace Townhomes",     manager: "Susan Lopez",            email: "susan@apartmentcorp.com",          ext: "227", region: "Region 2", regionalManager: "Leslie Rolon",      regionalEmail: "leslie@apartmentcorp.com" },
-  { property: "Grove Park",          manager: "Nikki Moreno",           email: "grovepark@apartmentcorp.com",      ext: "265", region: "Region 2", regionalManager: "Leslie Rolon",      regionalEmail: "leslie@apartmentcorp.com" },
-  { property: "Holiday",             manager: "Arlene Vinson",          email: "holiday@apartmentcorp.com",        ext: "235", region: "Region 2", regionalManager: "Leslie Rolon",      regionalEmail: "leslie@apartmentcorp.com" },
-  { property: "La Promesa",          manager: "Ashley Clay",            email: "lapromesa@apartmentcorp.com",      ext: "269", region: "Region 2", regionalManager: "Leslie Rolon",      regionalEmail: "leslie@apartmentcorp.com" },
-  { property: "Lexington",           manager: "Susan Lopez",            email: "susan@apartmentcorp.com",          ext: "227", region: "Region 2", regionalManager: "Leslie Rolon",      regionalEmail: "leslie@apartmentcorp.com" },
-  { property: "Walnut Hill",         manager: "Johann Armstead",        email: "walnut@apartmentcorp.com",         ext: "267", region: "Region 2", regionalManager: "Leslie Rolon",      regionalEmail: "leslie@apartmentcorp.com" },
-  { property: "Bayou Pointe",        manager: "Jennifer Frederick",     email: "bayou@apartmentcorp.com",          ext: "298", region: "Region 3", regionalManager: "Ginger Positerry",  regionalEmail: "ginger@apartmentcorp.com" },
-  { property: "Gates of Manhattan",  manager: "Lindgret Celestine",     email: "lindgret@apartmentcorp.com",       ext: "284", region: "Region 3", regionalManager: "Ginger Positerry",  regionalEmail: "ginger@apartmentcorp.com" },
-  { property: "Howell Place",        manager: "Sandra Crump",           email: "howell@apartmentcorp.com",         ext: "259", region: "Region 3", regionalManager: "Ginger Positerry",  regionalEmail: "ginger@apartmentcorp.com" },
-  { property: "Marrero",             manager: "Ketorah Parks",          email: "rubystarmanager@apartmentcorp.com",ext: "283", region: "Region 3", regionalManager: "Ginger Positerry",  regionalEmail: "ginger@apartmentcorp.com" },
-  { property: "North Pointe",        manager: "Jennifer Frederick",     email: "northpointe@apartmentcorp.com",    ext: "297", region: "Region 3", regionalManager: "Ginger Positerry",  regionalEmail: "ginger@apartmentcorp.com" },
-  { property: "Pelican Bay",         manager: "Dequanta Sutherland",    email: "pelican@apartmentcorp.com",        ext: "257", region: "Region 3", regionalManager: "Ginger Positerry",  regionalEmail: "ginger@apartmentcorp.com" },
-  { property: "Pirates Bend",        manager: "Sandra Crump",           email: "pirates@apartmentcorp.com",        ext: "260", region: "Region 3", regionalManager: "Ginger Positerry",  regionalEmail: "ginger@apartmentcorp.com" },
-  { property: "Ruby Diamond",        manager: "Ketorah Parks",          email: "rubystarmanager@apartmentcorp.com",ext: "283", region: "Region 3", regionalManager: "Ginger Positerry",  regionalEmail: "ginger@apartmentcorp.com" },
-  { property: "St. Charles",         manager: "Deon Tolliver",          email: "stcharles@apartmentcorp.com",      ext: "255", region: "Region 3", regionalManager: "Ginger Positerry",  regionalEmail: "ginger@apartmentcorp.com" },
-  { property: "Star",                manager: "Ketorah Parks",          email: "rubystarmanager@apartmentcorp.com",ext: "283", region: "Region 3", regionalManager: "Ginger Positerry",  regionalEmail: "ginger@apartmentcorp.com" },
-  { property: "Thibodaux",           manager: "Susie Rogers",           email: "colonialleasing@apartmentcorp.com",ext: "228", region: "Region 3", regionalManager: "Ginger Positerry",  regionalEmail: "ginger@apartmentcorp.com" },
-  { property: "Windsor / Yorkshire", manager: "Kimberly Powell",        email: "windsor@apartmentcorp.com",        ext: "291", region: "Region 3", regionalManager: "Ginger Positerry",  regionalEmail: "ginger@apartmentcorp.com" },
-  { property: "Anaheim Gardens",     manager: "Priscilla Walters",      email: "priscilla@apartmentcorp.com",      ext: "212", region: "Region 4", regionalManager: "Blake Weddington",  regionalEmail: "blake@apartmentcorp.com" },
-  { property: "Columbia",            manager: "Tammy Davis",            email: "tammy@apartmentcorp.com",          ext: "275", region: "Region 4", regionalManager: "Blake Weddington",  regionalEmail: "blake@apartmentcorp.com" },
-  { property: "Fairfax",             manager: "Shraga Kurs",            email: "alberto@apartmentcorp.com",        ext: "",    region: "Region 4", regionalManager: "Blake Weddington",  regionalEmail: "blake@apartmentcorp.com" },
-  { property: "Forest View",         manager: "Tammy / Heather",        email: "tammy@apartmentcorp.com",          ext: "277", region: "Region 4", regionalManager: "Blake Weddington",  regionalEmail: "blake@apartmentcorp.com" },
-  { property: "Granite Ridge",       manager: "James Abeyta",           email: "james@apartmentcorp.com",          ext: "242", region: "Region 4", regionalManager: "Blake Weddington",  regionalEmail: "blake@apartmentcorp.com" },
-  { property: "Midtown",             manager: "Steve Rand",             email: "alberto@apartmentcorp.com",        ext: "",    region: "Region 4", regionalManager: "Blake Weddington",  regionalEmail: "blake@apartmentcorp.com" },
-  { property: "Oak Hills",           manager: "Heather Hein",           email: "heatherh@apartmentcorp.com",       ext: "279", region: "Region 4", regionalManager: "Blake Weddington",  regionalEmail: "blake@apartmentcorp.com" },
-  { property: "Pacific",             manager: "Hailey Huber",           email: "pacificpointe@apartmentcorp.com",  ext: "243", region: "Region 4", regionalManager: "Blake Weddington",  regionalEmail: "blake@apartmentcorp.com" },
-  { property: "River Garden",        manager: "Heather Snyder",         email: "rivergarden@apartmentcorp.com",    ext: "252", region: "Region 4", regionalManager: "Blake Weddington",  regionalEmail: "blake@apartmentcorp.com" },
-  { property: "Urban",               manager: "Amunique Cannon",        email: "alberto@apartmentcorp.com",        ext: "",    region: "Region 4", regionalManager: "Blake Weddington",  regionalEmail: "blake@apartmentcorp.com" },
-  { property: "Wilmington",          manager: "Alberto Spence",         email: "alberto@apartmentcorp.com",        ext: "211", region: "Region 4", regionalManager: "Blake Weddington",  regionalEmail: "blake@apartmentcorp.com" },
-];
-
-const contactMap = Object.fromEntries(CONTACTS.map((c) => [c.property, c]));
-
-const REGIONS: { name: string; properties: string[] }[] = [
-  { name: "Region 1", properties: ["Arbor Crest","Boca Ciega","Coral Village","Jefferson","Macedonia","Opa Locka","River Pointe","Silver Springs","Thomasville"] },
-  { name: "Region 2", properties: ["Breckenridge","Crossroads","Cumberland","Grace Townhomes","Grove Park","Holiday","La Promesa","Lexington","Walnut Hill"] },
-  { name: "Region 3", properties: ["Bayou Pointe","Gates of Manhattan","Howell Place","Marrero","North Pointe","Pelican Bay","Pirates Bend","Ruby Diamond","St. Charles","Star","Thibodaux","Windsor / Yorkshire"] },
-  { name: "Region 4", properties: ["Anaheim Gardens","Columbia","Fairfax","Forest View","Granite Ridge","Midtown","Oak Hills","Pacific","River Garden","Urban","Wilmington"] },
-];
-
-const TOTAL = REGIONS.reduce((acc, r) => acc + r.properties.length, 0);
-const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const contactMap = CONTACT_BY_PROPERTY;
+const TOTAL = TOTAL_PROPERTIES;
+const MONTHS = MONTH_NAMES;
 
 function buildKey(region: string, property: string) { return `${region}::${property}`; }
 function monthKey(year: number, month: number) { return `${year}-${String(month + 1).padStart(2, "0")}`; }
@@ -176,6 +117,18 @@ export default function Home() {
   const { data: currentRows = [], refetch: refetchCurrent } = trpc.inspections.getMonth.useQuery({ monthKey: mk });
   const { data: prevRows = [] } = trpc.inspections.getMonth.useQuery({ monthKey: prevMk });
   const { data: savedMonthKeys = [], refetch: refetchMonths } = trpc.inspections.getSavedMonths.useQuery();
+
+  const utils = trpc.useUtils();
+  const [panel, setPanel] = useState<null | "run" | "test" | "saved" | "naming" | "predue">(null);
+  const naming = useNaming();
+  const activity = useScrapeActivity(() => { refetchCurrent(); refetchMonths(); utils.inspections.getMonth.invalidate(); utils.scraper.savedRuns.invalidate(); });
+  const running = activity.active.length > 0;
+  const openMonth = (key: string) => {
+    const [y, m] = key.split("-").map(Number);
+    setSelectedYear(y);
+    setSelectedMonth(m - 1);
+    setPanel(null);
+  };
 
   const state: InspectionState = rowsToState(currentRows);
   const prevState: InspectionState = rowsToState(prevRows);
@@ -418,7 +371,28 @@ export default function Home() {
                 Due: 21st of Every Month
               </p>
             </div>
-            <div className="flex gap-2 flex-wrap print:hidden items-center">
+            <div className="flex gap-2 flex-wrap print:hidden items-center justify-end">
+              <button
+                onClick={() => setPanel("run")}
+                disabled={running}
+                title={running ? "A scrape is already running" : "Pull inspections from MyLoneWorkers"}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-md bg-emerald-500 hover:bg-emerald-400 text-white text-sm font-semibold transition-all active:scale-95 shadow disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Play className="w-4 h-4" />
+                {running ? "Scraper Running…" : "Run Scraper"}
+              </button>
+              <button onClick={() => setPanel("test")} disabled={running} className="flex items-center gap-1.5 px-3 py-2 rounded-md bg-white/10 hover:bg-white/20 text-white text-sm transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed" title="Scrape a few properties to check their MyLoneWorkers mapping">
+                <FlaskConical className="w-4 h-4" /> Test Mappings
+              </button>
+              <button onClick={() => setPanel("saved")} className="flex items-center gap-1.5 px-3 py-2 rounded-md bg-white/10 hover:bg-white/20 text-white text-sm transition-all active:scale-95" title="View and rename saved scraper runs">
+                <Bookmark className="w-4 h-4" /> Saved Runs
+              </button>
+              <button onClick={() => setPanel("naming")} className="flex items-center gap-1.5 px-3 py-2 rounded-md bg-white/10 hover:bg-white/20 text-white text-sm transition-all active:scale-95" title="Edit run and downloaded PDF naming conventions">
+                <Tag className="w-4 h-4" /> Naming
+              </button>
+              <button onClick={() => setPanel("predue")} className="flex items-center gap-1.5 px-3 py-2 rounded-md bg-white/10 hover:bg-white/20 text-white text-sm transition-all active:scale-95" title="Draft reminders to regional managers before the 21st">
+                <BellRing className="w-4 h-4" /> Pre-Due Reminders
+              </button>
               {/* History button */}
               <button
                 onClick={() => setShowHistoryModal(true)}
@@ -557,6 +531,9 @@ export default function Home() {
         </div>
       </header>
 
+      <UnmappedBanner />
+      <ScrapeActivityPanel runs={activity.runs as any} active={activity.active as any} />
+
       {/* ── Legend ── */}
       <div className="max-w-6xl mx-auto px-6 pt-3 pb-1 print:hidden">
         <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-gray-500 items-center">
@@ -598,6 +575,7 @@ export default function Home() {
           prevState={prevState}
           currentLabel={monthLabel}
           prevLabel={prevMonthLabel}
+          naming={naming}
           onClose={() => setShowCompareModal(false)}
         />
       )}
@@ -609,9 +587,16 @@ export default function Home() {
           checkedCount={checkedCount}
           monthLabel={monthLabel}
           state={mergedState}
+          naming={naming}
           onClose={() => setShowSummaryModal(false)}
         />
       )}
+
+      {panel === "run" && <RunScraperModal onClose={() => setPanel(null)} onStarted={() => activity.refetch()} />}
+      {panel === "test" && <TestMappingsModal onClose={() => setPanel(null)} onStarted={() => activity.refetch()} />}
+      {panel === "saved" && <SavedRunsModal onClose={() => setPanel(null)} onOpenMonth={openMonth} />}
+      {panel === "naming" && <NamingModal onClose={() => setPanel(null)} currentMonthKey={mk} />}
+      {panel === "predue" && <PreDueModal status={mergedState} monthLabel={monthLabel} onClose={() => setPanel(null)} />}
 
       {/* ── Email Modal ── */}
       {showEmailModal && (
@@ -712,7 +697,12 @@ function RegionBlock({ region, state, onToggle, onAttachPDF, onNote }: {
                   status.checked && !status.xed ? "text-green-800"
                   : status.xed && !status.checked ? "text-red-800"
                   : status.checked && status.xed ? "text-amber-800"
-                  : "text-gray-800"}`}>{prop}</span>
+                  : "text-gray-800"}`}>
+                  {prop}
+                  {NOT_ON_MYLONEWORKERS.includes(prop) && (
+                    <span title="Not connected to MyLoneWorkers; tracked by hand" className="ml-1.5 align-middle rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 print:hidden">Not mapped</span>
+                  )}
+                </span>
                 <div className="w-28 flex-shrink-0 print:hidden">
                   <PDFDropZone pdf={status.pdf ?? null} onAttach={(pdf) => onAttachPDF(key, pdf)} onRemove={() => onAttachPDF(key, null)} />
                 </div>
@@ -799,13 +789,25 @@ function PDFDropZone({ pdf, onAttach, onRemove }: {
 
 // ─── Summary Modal ────────────────────────────────────────────────────────────
 
-function SummaryModal({ xedProperties, checkedCount, monthLabel, state, onClose }: {
+function previousLabelOf(label: string) {
+  const [name, year] = label.split(" ");
+  const i = MONTHS.indexOf(name);
+  return i < 0 ? label : i === 0 ? `${MONTHS[11]} ${Number(year) - 1}` : `${MONTHS[i - 1]} ${year}`;
+}
+
+function namingValues(monthLabel: string, prevLabel = previousLabelOf(monthLabel)) {
+  return { month: monthLabel, previous: prevLabel, start: monthLabel, end: monthLabel, count: 1 };
+}
+
+function SummaryModal({ xedProperties, checkedCount, monthLabel, state, naming, onClose }: {
   xedProperties: string[];
   checkedCount: number;
   monthLabel: string;
   state: InspectionState;
+  naming: NamingSettings;
   onClose: () => void;
 }) {
+  const fileName = applyNamingTemplate(naming.summaryPdfTemplate, namingValues(monthLabel), DEFAULT_NAMING.summaryPdfTemplate);
   const notReviewed = TOTAL - Object.values(state).filter((s) => s.checked || s.xed).length;
   const byRegion = REGIONS.map((r) => ({
     name: r.name,
@@ -821,7 +823,7 @@ function SummaryModal({ xedProperties, checkedCount, monthLabel, state, onClose 
             const c = contactMap[prop];
             return `<tr style="border-bottom:1px solid #fee2e2">
               <td style="padding:3px 6px;font-size:8pt;font-weight:600;color:#991b1b;width:40%">${prop}</td>
-              <td style="padding:3px 6px;font-size:8pt;color:#b91c1c">${c ? c.manager : ""}</td>
+              <td style="padding:3px 6px;font-size:8pt;color:#b91c1c">${c ? c.manager || "No manager listed" : ""}</td>
               <td style="padding:3px 6px;font-size:8pt;color:#b91c1c">${c?.ext ? "Ext. " + c.ext : ""}</td>
               <td style="padding:3px 6px;font-size:7pt;color:#dc2626;text-align:right">✗</td>
             </tr>`;
@@ -832,7 +834,7 @@ function SummaryModal({ xedProperties, checkedCount, monthLabel, state, onClose 
 
     const win = window.open("", "_blank");
     if (!win) return;
-    win.document.write(`<!DOCTYPE html><html><head><title>Inspection Summary — ${monthLabel}</title>
+    win.document.write(`<!DOCTYPE html><html><head><title>${fileName}</title>
       <style>@page{size:letter portrait;margin:0.4in 0.5in} body{font-family:Arial,sans-serif;font-size:9pt} h1{font-size:14pt;margin:0} p{margin:2px 0;font-size:8pt;color:#555}</style>
     </head><body>
       <div style="background:#1e2d4a;color:white;padding:8px 12px;border-radius:4px;margin-bottom:10px">
@@ -851,6 +853,27 @@ function SummaryModal({ xedProperties, checkedCount, monthLabel, state, onClose 
     setTimeout(() => { win.print(); }, 300);
   };
 
+  const downloadSummary = () => downloadReportPdf({
+    title: "Monthly Inspections — Summary",
+    subtitle: `${monthLabel}  |  Due: 21st of Every Month`,
+    stats: [
+      { label: "Completed", value: String(checkedCount) },
+      { label: "Not Done / Issues", value: String(xedProperties.length) },
+      { label: "Not Reviewed", value: String(notReviewed) },
+    ],
+    sections: byRegion.map((r) => ({
+      title: r.name,
+      tint: [254, 242, 242] as [number, number, number],
+      headers: ["Property", "Manager", "Ext.", "Note"],
+      widths: [3, 3, 1, 5],
+      rows: r.xed.map((prop) => {
+        const c = contactMap[prop];
+        return [prop, c ? c.manager || "No manager listed" : "", c?.ext ?? "", state[buildKey(r.name, prop)]?.note ?? ""];
+      }),
+    })),
+    emptyMessage: "No issues this month!",
+  }, fileName);
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.55)" }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
@@ -861,6 +884,9 @@ function SummaryModal({ xedProperties, checkedCount, monthLabel, state, onClose 
             <p className="text-[#93b4d8] text-xs mt-0.5">{monthLabel}</p>
           </div>
           <div className="flex items-center gap-2">
+            <button onClick={downloadSummary} title={`Download ${fileName}.pdf`} className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-white/10 hover:bg-white/20 text-white text-xs font-medium transition-all active:scale-95">
+              <Download className="w-3.5 h-3.5" /> Download PDF
+            </button>
             <button onClick={printSummary} title="Print summary" className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-white/10 hover:bg-white/20 text-white text-xs font-medium transition-all active:scale-95">
               <Printer className="w-3.5 h-3.5" /> Print
             </button>
@@ -913,7 +939,7 @@ function SummaryModal({ xedProperties, checkedCount, monthLabel, state, onClose 
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2 flex-wrap">
                               <span className="text-sm font-semibold text-red-800">{prop}</span>
-                              {c && <span className="text-xs text-red-500">— {c.manager}{c.ext ? <span className="ml-1 text-red-400">Ext. {c.ext}</span> : ""}</span>}
+                              {c && <span className="text-xs text-red-500">— {c.manager || "No manager listed"}{c.ext ? <span className="ml-1 text-red-400">Ext. {c.ext}</span> : ""}</span>}
                             </div>
                             <span className="text-red-500 font-bold text-sm flex-shrink-0 ml-2">✗</span>
                           </div>
@@ -1012,13 +1038,15 @@ function EmailModal({ drafts, onClose, copiedIdx, onCopy, onOpen }: {
 
 // ─── Compare Modal ────────────────────────────────────────────────────────────
 
-function CompareModal({ currentState, prevState, currentLabel, prevLabel, onClose }: {
+function CompareModal({ currentState, prevState, currentLabel, prevLabel, naming, onClose }: {
   currentState: InspectionState;
   prevState: InspectionState;
   currentLabel: string;
   prevLabel: string;
+  naming: NamingSettings;
   onClose: () => void;
 }) {
+  const fileName = applyNamingTemplate(naming.comparePdfTemplate, namingValues(currentLabel, prevLabel), DEFAULT_NAMING.comparePdfTemplate);
   const hasPrevData = Object.keys(prevState).length > 0;
 
   const printCompare = () => {
@@ -1052,7 +1080,7 @@ function CompareModal({ currentState, prevState, currentLabel, prevLabel, onClos
 
     const win = window.open('', '_blank');
     if (!win) return;
-    win.document.write(`<!DOCTYPE html><html><head><title>Comparison — ${prevLabel} vs ${currentLabel}</title>
+    win.document.write(`<!DOCTYPE html><html><head><title>${fileName}</title>
       <style>@page{size:letter portrait;margin:0.4in 0.5in} body{font-family:Arial,sans-serif;font-size:9pt} h1{font-size:13pt;margin:0} p{margin:2px 0;font-size:8pt;color:#93b4d8}</style>
     </head><body>
       <div style="background:#1e2d4a;color:white;padding:8px 12px;border-radius:4px;margin-bottom:10px">
@@ -1153,6 +1181,31 @@ function CompareModal({ currentState, prevState, currentLabel, prevLabel, onClos
   const prvPassed = rows.filter((r) => r.prvStatus === "pass").length;
   const prvFailed = rows.filter((r) => r.prvStatus === "fail").length;
 
+  const statusText = (x: string) => (x === "pass" ? "Pass" : x === "fail" ? "Fail" : x === "both" ? "Both" : "—");
+  const compareSection = (title: string, items: typeof rows, tint: [number, number, number]) => ({
+    title: `${title} (${items.length})`,
+    tint,
+    headers: ["Property", "Region", prevLabel, currentLabel, "Note"],
+    widths: [3, 2, 2, 2, 4],
+    rows: items.map((r) => [r.prop, r.region, statusText(r.prvStatus), statusText(r.curStatus), r.curNote ?? ""]),
+  });
+  const downloadCompare = () => downloadReportPdf({
+    title: "Month Comparison",
+    subtitle: `${prevLabel} → ${currentLabel}`,
+    stats: [
+      { label: "Passed", value: `${prvPassed} → ${curPassed}` },
+      { label: "Failed", value: `${prvFailed} → ${curFailed}` },
+      { label: "Improved", value: String(improved.length) },
+      { label: "Regressed", value: String(regressed.length) },
+    ],
+    sections: [
+      compareSection("Regressed (was passing, now failing)", regressed, [254, 242, 242]),
+      compareSection("Improved (was failing, now passing)", improved, [240, 253, 244]),
+      compareSection("Consistent Pass", same.filter((r) => r.curStatus === "pass"), [240, 253, 244]),
+      compareSection("Persistent Fail", same.filter((r) => r.curStatus === "fail"), [254, 242, 242]),
+    ],
+  }, fileName);
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.55)" }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
@@ -1166,6 +1219,9 @@ function CompareModal({ currentState, prevState, currentLabel, prevLabel, onClos
             <p className="text-[#93b4d8] text-xs mt-0.5">{prevLabel} → {currentLabel}</p>
           </div>
           <div className="flex items-center gap-2">
+            <button onClick={downloadCompare} disabled={!hasPrevData} title={`Download ${fileName}.pdf`} className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-white/10 hover:bg-white/20 text-white text-xs font-medium transition-all active:scale-95 disabled:opacity-40">
+              <Download className="w-3.5 h-3.5" /> Download PDF
+            </button>
             <button onClick={printCompare} className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-white/10 hover:bg-white/20 text-white text-xs font-medium transition-all active:scale-95">
               <Printer className="w-3.5 h-3.5" /> Print
             </button>

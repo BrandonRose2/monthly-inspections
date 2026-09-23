@@ -1,5 +1,12 @@
 # Features present in the Manus build, absent from this repo
 
+> **Status, Sept 2026:** rebuilt from the live Manus bundle: Run Scraper,
+> Test Mappings, Scrape Activity, Saved Runs, Naming (with Summary / Compare
+> PDF downloads), Pre-Due Reminders, the "not connected to MyLoneWorkers"
+> banner, and the Manus property names. Transition Drafts were dropped on
+> purpose. Contacts come from the Notion "Company Contacts" list. The notes
+> below are the original gap list, kept for history.
+
 Recalled by Brandon while reviewing the migrated app. Each was verified as
 genuinely absent from this repository — not lost during the Vercel migration.
 The repo simply lagged behind the deployed Manus version.

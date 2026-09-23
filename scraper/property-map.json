@@ -2,7 +2,7 @@
   "_comment": [
     "Maps MyLoneWorkers property names (keys) to the portal's canonical",
     "{ region, property } (values). The portal's property names come from",
-    "REGIONS in client/src/pages/Home.tsx and must match exactly, or the",
+    "REGIONS in shared/properties.ts and must match exactly, or the",
     "scraped record will not line up with the row shown in the UI.",
     "",
     "A value of null means 'not inspected via MyLoneWorkers' and is skipped.",
@@ -24,15 +24,15 @@
     },
     "Macedonia": {
       "region": "Region 1",
-      "property": "Macedonia"
+      "property": "Macedonia Garden Apts"
     },
     "Opa Locka Apts": {
       "region": "Region 1",
-      "property": "Opa Locka"
+      "property": "Opa Lock 135th St Apts"
     },
     "Breckenridge": {
       "region": "Region 2",
-      "property": "Breckenridge"
+      "property": "Breckenridge Village"
     },
     "Crossroads": {
       "region": "Region 2",
@@ -40,7 +40,7 @@
     },
     "Cumberland Apts": {
       "region": "Region 2",
-      "property": "Cumberland"
+      "property": "Cumberland Apts"
     },
     "Grace Townhomes": {
       "region": "Region 2",
@@ -48,7 +48,7 @@
     },
     "Holiday Apts": {
       "region": "Region 2",
-      "property": "Holiday"
+      "property": "Holiday Apts"
     },
     "La Promesa": {
       "region": "Region 2",
@@ -72,7 +72,7 @@
     },
     "Thibodaux": {
       "region": "Region 3",
-      "property": "Thibodaux"
+      "property": "Thibodaux Colonial Estates"
     },
     "Forest View Apts": {
       "region": "Region 4",
@@ -88,7 +88,7 @@
     },
     "Jefferson Arms Apts": {
       "region": "Region 1",
-      "property": "Jefferson"
+      "property": "Jefferson Arms Apts"
     },
     "River Point Apts": {
       "region": "Region 1",
@@ -104,15 +104,15 @@
     },
     "Grove Park Terrace": {
       "region": "Region 2",
-      "property": "Grove Park"
+      "property": "Grove Park Terrace"
     },
     "Gates On Manhattan": {
       "region": "Region 3",
-      "property": "Gates of Manhattan"
+      "property": "The Gates on Manhattan"
     },
     "Marrero 3": {
       "region": "Region 3",
-      "property": "Marrero"
+      "property": "Marrero 3"
     },
     "St Charles Place": {
       "region": "Region 3",
@@ -120,7 +120,7 @@
     },
     "Star Homes": {
       "region": "Region 3",
-      "property": "Star"
+      "property": "Star Homes"
     },
     "Yorkshire Windsor": {
       "region": "Region 3",
@@ -128,7 +128,7 @@
     },
     "Midtown Manor": {
       "region": "Region 4",
-      "property": "Midtown"
+      "property": "Midtown Manor"
     },
     "River Gardens": {
       "region": "Region 4",
@@ -136,15 +136,15 @@
     },
     "Pacific Pointe": {
       "region": "Region 4",
-      "property": "Pacific"
+      "property": "Pacific Pointe Apts"
     },
     "Columbia Village": {
       "region": "Region 4",
-      "property": "Columbia"
+      "property": "Columbia Village Apts"
     },
     "NWA": {
       "region": "Region 4",
-      "property": "Wilmington"
+      "property": "New Wilmington Arms"
     }
   },
   "needs_confirmation": {
@@ -170,8 +170,7 @@
     ]
   },
   "portal_properties_with_no_myloneworkers_source": [
-    "Anaheim Gardens",
     "Fairfax",
-    "Urban"
+    "Central Apts / Urban Rehab"
   ]
 }

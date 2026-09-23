@@ -17,12 +17,28 @@ on:
         description: 'Month to scrape as YYYY-MM (blank = current month)'
         type: string
         required: false
+      start_month:
+        description: 'First month of a range, YYYY-MM (the portal fills this in)'
+        type: string
+        required: false
+      end_month:
+        description: 'Last month of a range, YYYY-MM'
+        type: string
+        required: false
+      only:
+        description: 'Comma-separated portal properties to file (blank = all)'
+        type: string
+        required: false
+      run_id:
+        description: 'Portal run to report progress to (set by the portal)'
+        type: string
+        required: false
 
 concurrency:
   # Keyed by month so back-filling several months can queue independently.
   # A single shared group only holds one pending run, so each new dispatch
   # cancelled the previous one instead of queueing behind it.
-  group: scrape-inspections-${{ inputs.month || 'current' }}
+  group: scrape-inspections-${{ inputs.run_id || inputs.start_month || inputs.month || 'current' }}
   cancel-in-progress: false
 
 jobs:
@@ -45,6 +61,7 @@ jobs:
         run: npm test
 
       - name: Pull MyLoneWorkers activity and file results
+        id: scrape
         working-directory: scraper
         env:
           PORTAL_BASE_URL: ${{ vars.PORTAL_BASE_URL }}
@@ -52,16 +69,34 @@ jobs:
           HEADLESS: 'true'
           DRY_RUN: ${{ inputs.dry_run }}
           MONTH: ${{ inputs.month }}
+          START_MONTH: ${{ inputs.start_month }}
+          END_MONTH: ${{ inputs.end_month }}
+          ONLY: ${{ inputs.only }}
+          RUN_ID: ${{ inputs.run_id }}
           MIN_UNITS: ${{ vars.MIN_UNITS || '3' }}
         run: npm run scrape
+
+      # The scraper reports its own failures; this covers a failure before it
+      # started (install or tests), so the portal doesn't wait on the run.
+      - name: Tell the portal the run could not start
+        if: failure() && inputs.run_id != '' && steps.scrape.outcome == 'skipped'
+        env:
+          PORTAL_BASE_URL: ${{ vars.PORTAL_BASE_URL }}
+          INGEST_TOKEN: ${{ secrets.INGEST_TOKEN }}
+          RUN_ID: ${{ inputs.run_id }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          curl -sS -X POST "$PORTAL_BASE_URL/api/trpc/scraper.progress" \
+            -H "authorization: Bearer $INGEST_TOKEN" -H 'content-type: application/json' \
+            -d "{\"json\":{\"id\":$RUN_ID,\"status\":\"failed\",\"errorMessage\":\"The scraper could not start on the Mac runner. See $RUN_URL\"}}" || true
 
       - name: Keep this run's results and PDF reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: inspection-results-${{ inputs.month || 'current' }}-${{ github.run_number }}
+          name: inspection-results-${{ inputs.start_month || inputs.month || 'current' }}-${{ github.run_number }}
           path: |
-            scraper/output/results.json
+            scraper/output/results*.json
             scraper/output/pdfs/
           retention-days: 90
           if-no-files-found: ignore

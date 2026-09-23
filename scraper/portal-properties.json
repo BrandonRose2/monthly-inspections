@@ -1,10 +1,77 @@
 {
-  "_comment": "Mirror of REGIONS in client/src/pages/Home.tsx. test/portal-properties.test.js fails if the two drift apart.",
+  "_comment": "Mirror of REGIONS, NOT_ON_MYLONEWORKERS and LEGACY_PROPERTY_NAMES in shared/properties.ts. test/portal-properties.test.js fails if they drift apart. aliases: earlier short names, still used to match MyLoneWorkers site names.",
   "regions": {
-    "Region 1": ["Arbor Crest", "Boca Ciega", "Coral Village", "Jefferson", "Macedonia", "Opa Locka", "River Pointe", "Silver Springs", "Thomasville"],
-    "Region 2": ["Breckenridge", "Crossroads", "Cumberland", "Grace Townhomes", "Grove Park", "Holiday", "La Promesa", "Lexington", "Walnut Hill"],
-    "Region 3": ["Bayou Pointe", "Gates of Manhattan", "Howell Place", "Marrero", "North Pointe", "Pelican Bay", "Pirates Bend", "Ruby Diamond", "St. Charles", "Star", "Thibodaux", "Windsor / Yorkshire"],
-    "Region 4": ["Anaheim Gardens", "Columbia", "Fairfax", "Forest View", "Granite Ridge", "Midtown", "Oak Hills", "Pacific", "River Garden", "Urban", "Wilmington"]
+    "Region 1": [
+      "Arbor Crest",
+      "Boca Ciega",
+      "Coral Village",
+      "Jefferson Arms Apts",
+      "Macedonia Garden Apts",
+      "Opa Lock 135th St Apts",
+      "River Pointe",
+      "Silver Springs",
+      "Thomasville"
+    ],
+    "Region 2": [
+      "Breckenridge Village",
+      "Crossroads",
+      "Cumberland Apts",
+      "Grace Townhomes",
+      "Grove Park Terrace",
+      "Holiday Apts",
+      "La Promesa",
+      "Lexington",
+      "Walnut Hill"
+    ],
+    "Region 3": [
+      "Bayou Pointe",
+      "The Gates on Manhattan",
+      "Howell Place",
+      "Marrero 3",
+      "North Pointe",
+      "Pelican Bay",
+      "Pirates Bend",
+      "Ruby Diamond",
+      "St. Charles",
+      "Star Homes",
+      "Thibodaux Colonial Estates",
+      "Windsor / Yorkshire"
+    ],
+    "Region 4": [
+      "Anaheim Apts",
+      "Columbia Village Apts",
+      "Fairfax",
+      "Forest View",
+      "Granite Ridge",
+      "Midtown Manor",
+      "Oak Hills",
+      "Pacific Pointe Apts",
+      "River Garden",
+      "Central Apts / Urban Rehab",
+      "New Wilmington Arms"
+    ]
   },
-  "not_on_myloneworkers": ["Anaheim Gardens", "Fairfax", "Urban"]
+  "not_on_myloneworkers": [
+    "Fairfax",
+    "Central Apts / Urban Rehab"
+  ],
+  "aliases": {
+    "Jefferson": "Jefferson Arms Apts",
+    "Macedonia": "Macedonia Garden Apts",
+    "Opa Locka": "Opa Lock 135th St Apts",
+    "Breckenridge": "Breckenridge Village",
+    "Cumberland": "Cumberland Apts",
+    "Grove Park": "Grove Park Terrace",
+    "Holiday": "Holiday Apts",
+    "Gates of Manhattan": "The Gates on Manhattan",
+    "Marrero": "Marrero 3",
+    "Star": "Star Homes",
+    "Thibodaux": "Thibodaux Colonial Estates",
+    "Anaheim Gardens": "Anaheim Apts",
+    "Columbia": "Columbia Village Apts",
+    "Midtown": "Midtown Manor",
+    "Pacific": "Pacific Pointe Apts",
+    "Urban": "Central Apts / Urban Rehab",
+    "Wilmington": "New Wilmington Arms"
+  }
 }
