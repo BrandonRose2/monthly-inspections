@@ -1,12 +1,12 @@
 // Scraper controls and the other Manus-era panels: Scrape Activity, Run
 // Scraper, Test Mappings, Saved Runs, Naming, Pre-Due Reminders and the
 // "not connected to MyLoneWorkers" banner.
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { downloadReportPdf } from "@/lib/reportPdf";
 import {
   AlertTriangle, Activity, BellRing, Check, Copy, Download, ExternalLink, FlaskConical, Loader2, Mail, Pencil,
-  Play, Printer, RotateCcw, Save, Tag, Trash2, X as XIcon,
+  Play, Printer, RotateCcw, Save, Tag, Terminal, Trash2, X as XIcon,
 } from "lucide-react";
 import {
   applyNamingTemplate, buildPreDueReminders, DEFAULT_NAMING, mappingHealth, MONTH_NAMES, monthLabelOf, monthRange,
@@ -144,7 +144,7 @@ export function useScrapeActivity(onRunFinished: (run: Run) => void) {
   return { runs, active, refetch: query.refetch, isLoading: query.isLoading };
 }
 
-export function ScrapeActivityPanel({ runs, active }: { runs: Run[]; active: Run[] }) {
+export function ScrapeActivityPanel({ runs, active, onViewLog }: { runs: Run[]; active: Run[]; onViewLog: (runId: number) => void }) {
   return (
     <section className="mx-auto max-w-6xl px-6 pt-4 print:hidden" aria-label="Scrape activity">
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -184,8 +184,14 @@ export function ScrapeActivityPanel({ runs, active }: { runs: Run[]; active: Run
                       {r.githubRunUrl && <> · <a href={r.githubRunUrl} target="_blank" rel="noreferrer" className="text-sky-700 hover:underline inline-flex items-center gap-0.5">GitHub log <ExternalLink className="h-3 w-3" /></a></>}
                     </div>
                   </div>
-                  <div className="text-xs text-slate-600 font-medium">
-                    <span className="text-emerald-700">{r.passed} passed</span> · <span className="text-red-600">{r.failed} issues</span> · <span className="text-blue-600">{r.pdfs} PDFs</span>
+                  <div className="flex items-center gap-3">
+                    <div className="text-xs text-slate-600 font-medium">
+                      <span className="text-emerald-700">{r.passed} passed</span> · <span className="text-red-600">{r.failed} issues</span> · <span className="text-blue-600">{r.pdfs} PDFs</span>
+                    </div>
+                    <button onClick={() => onViewLog(r.id)}
+                      className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold transition-colors ${live ? "bg-[#1e2d4a] text-white hover:bg-[#2a3f6b]" : "border border-slate-200 text-slate-600 hover:bg-slate-50"}`}>
+                      <Terminal className="h-3.5 w-3.5" /> {live ? "Watch live" : "View log"}
+                    </button>
                   </div>
                 </div>
                 <div className="mt-2 h-1.5 rounded-full bg-slate-100 overflow-hidden">
@@ -239,7 +245,7 @@ function MonthPicker({ label, value, onChange, years }: { label: string; value: 
   );
 }
 
-export function RunScraperModal({ onClose, onStarted }: { onClose: () => void; onStarted: () => void }) {
+export function RunScraperModal({ onClose, onStarted }: { onClose: () => void; onStarted: (runId: number) => void }) {
   const now = todayMonthKey();
   const [start, setStart] = useState(now);
   const [end, setEnd] = useState(now);
@@ -248,7 +254,7 @@ export function RunScraperModal({ onClose, onStarted }: { onClose: () => void; o
   const months = monthRange(start, end);
   const future = end > now;
   const mutation = trpc.scraper.start.useMutation({
-    onSuccess: () => { onStarted(); onClose(); },
+    onSuccess: run => { onStarted(run.id); },
     onError: err => setError(errorText(err)),
   });
   const valid = months.length > 0 && months.length <= 36 && !future;
@@ -300,13 +306,13 @@ export function RunScraperModal({ onClose, onStarted }: { onClose: () => void; o
 
 // ── Test Mappings ─────────────────────────────────────────────────────────────
 
-export function TestMappingsModal({ onClose, onStarted }: { onClose: () => void; onStarted: () => void }) {
+export function TestMappingsModal({ onClose, onStarted }: { onClose: () => void; onStarted: (runId: number) => void }) {
   const mapped = mappingHealth().filter(p => p.mapped);
   const [picked, setPicked] = useState<string[]>([]);
   const [error, setError] = useState("");
   const month = todayMonthKey();
   const mutation = trpc.scraper.start.useMutation({
-    onSuccess: () => { onStarted(); onClose(); },
+    onSuccess: run => { onStarted(run.id); },
     onError: err => setError(errorText(err)),
   });
   const all = picked.length === mapped.length;
@@ -562,6 +568,88 @@ export function PreDueModal({ status, monthLabel, onClose }: { status: Status; m
           </div>
         </div>
       )}
+    </Modal>
+  );
+}
+
+// ── Live console (the Manus "Run Scraper" log view) ─────────────────────────
+
+function lineClass(line: string) {
+  if (line.startsWith("━")) return "text-white font-bold mt-2";
+  if (line.includes("✅")) return "text-emerald-400";
+  if (line.includes("❌")) return "text-red-400";
+  if (line.includes("⚠️")) return "text-yellow-400";
+  if (line.includes("📄")) return "text-blue-400";
+  if (line.includes("🔐")) return "text-purple-400";
+  if (line.startsWith("[")) return "text-white/85";
+  return "text-white/70";
+}
+
+export function RunConsoleModal({ runId, onClose }: { runId: number; onClose: () => void }) {
+  const [lines, setLines] = useState<{ id: number; line: string }[]>([]);
+  const [afterId, setAfterId] = useState(0);
+  const [live, setLive] = useState(true);
+  const box = useRef<HTMLDivElement>(null);
+  const stick = useRef(true);
+  const { data } = trpc.scraper.log.useQuery({ runId, afterId }, { refetchInterval: live ? 2000 : false });
+  const run = data?.run as Run | null | undefined;
+  const active = !run || run.status === "queued" || run.status === "running";
+
+  useEffect(() => {
+    if (!data) return;
+    if (data.lines.length) {
+      setLines(prev => {
+        const seen = new Set(prev.map(l => l.id));
+        return [...prev, ...data.lines.filter(l => !seen.has(l.id))];
+      });
+      setAfterId(data.lines[data.lines.length - 1].id);
+    }
+    // Keep polling until the run has finished and its last lines are in.
+    if (data.run && !(data.run.status === "queued" || data.run.status === "running") && !data.lines.length) setLive(false);
+  }, [data]);
+
+  useEffect(() => {
+    if (stick.current && box.current) box.current.scrollTop = box.current.scrollHeight;
+  }, [lines.length]);
+
+  const done = run && !active;
+  return (
+    <Modal dark title={run?.label ?? "Run Scraper"} subtitle={run ? `${rangeLabel(run)} · ${run.completedMonths}/${run.totalMonths} month${run.totalMonths === 1 ? "" : "s"}` : undefined}
+      icon={<Terminal className="w-5 h-5 text-emerald-400" />} onClose={onClose} width={640}
+      footer={done ? (
+        <>
+          <span className="text-xs text-white/50">{run.completedAt ? `Finished ${when(run.completedAt)}` : ""}</span>
+          <button onClick={onClose} className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-400 active:scale-95">Close</button>
+        </>
+      ) : (
+        <>
+          <span className="text-xs text-white/50">You can close this; the run keeps going on the Mac.</span>
+          <span className="flex items-center gap-2 text-sm text-white/80">
+            <Loader2 className="h-4 w-4 animate-spin" /> {run?.status === "queued" ? "Waiting for the Mac runner…" : "Running, please wait..."}
+          </span>
+        </>
+      )}>
+      <div className="px-5 py-4 flex flex-col gap-3">
+        <div ref={box} onScroll={e => { const el = e.currentTarget; stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40; }}
+          className="bg-black/30 rounded-lg p-3 overflow-y-auto text-xs font-mono leading-relaxed" style={{ minHeight: 260, maxHeight: "55vh" }}>
+          {lines.length === 0 && <div className="text-white/40">{!run ? "Loading…" : active ? "No log lines yet." : "No live log was recorded for this run."}</div>}
+          {lines.map(l => <div key={l.id} className={`py-0.5 whitespace-pre-wrap break-words ${lineClass(l.line)}`}>{l.line}</div>)}
+          {active && <div className="text-white/40 animate-pulse mt-1">Running...</div>}
+        </div>
+        {done && (
+          <div className="bg-black/20 rounded-lg p-4 text-center">
+            <p className="text-white font-semibold text-base mb-2">
+              {run.status === "failed" ? "Scraper Failed" : run.status === "stalled" ? "No response from the Mac runner" : "Scraper Complete!"}
+            </p>
+            <div className="flex justify-center gap-6">
+              <div><div className="text-2xl font-bold text-emerald-400">{run.passed}</div><div className="text-xs text-white/60">Passed</div></div>
+              <div><div className="text-2xl font-bold text-red-400">{run.failed}</div><div className="text-xs text-white/60">Issues</div></div>
+              <div><div className="text-2xl font-bold text-blue-400">{run.pdfs}</div><div className="text-xs text-white/60">PDFs</div></div>
+            </div>
+            {run.errorMessage && <p className="mt-3 text-xs text-red-300">{run.errorMessage}</p>}
+          </div>
+        )}
+      </div>
     </Modal>
   );
 }

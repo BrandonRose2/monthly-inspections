@@ -34,13 +34,14 @@
  */
 const fs = require('fs');
 const path = require('path');
-const { monthWindows, currentMonthKey, monthRange } = require('./lib/time');
+const { monthWindows, currentMonthKey, monthRange, formatLocalDate } = require('./lib/time');
 const { fetchAllEvents, fetchFormsPdfs, SessionExpiredError } = require('./lib/mlw-api');
 const { attribute } = require('./lib/attribute');
 const { buildReportPdf } = require('./lib/report-pdf');
 const { mergePdfs } = require('./lib/pdf-merge');
 const { makeReporter } = require('./lib/progress');
 
+const STATUS_ICON = { pass: '✅', late: '⚠️', partial: '❌', other_sites_only: '❌', tour_no_scans: '❌', no_activity: '❌' };
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 const CONFIG = {
@@ -147,12 +148,14 @@ async function runMonth({ monthKey, index, count, token, portal, siteMap, worker
   const step = count > 1 ? ` (${index + 1} of ${count})` : '';
 
   console.log(`\nMonthly Inspections — ${monthLabel}${step}${CONFIG.dryRun ? ' (DRY RUN)' : ''}`);
+  await reporter.line(`━━━ Starting ${monthLabel}${step} ━━━`);
   console.log(`Deadline: day ${CONFIG.dueDay} of the month, ${CONFIG.timeZone}; pass = at least ${CONFIG.minUnits} units scanned`);
   await reporter.update({ currentMonthKey: monthKey, currentProperty: null, progressMessage: `Fetching ${monthLabel} from MyLoneWorkers${step}` });
 
   const to = Math.min(windows.monthEnd, Math.floor(Date.now() / 1000));
   const events = await fetchAllEvents(token, { guardIds, from: windows.start, to });
   console.log(`Fetched ${events.length} events from MyLoneWorkers`);
+  await reporter.line(`✅ Fetched ${events.length} events from MyLoneWorkers (${formatLocalDate(windows.start, CONFIG.timeZone)} – ${formatLocalDate(to, CONFIG.timeZone)})`);
 
   const { results, unmatchedSites, unknownWorkers } = attribute({
     events, windows, portal, siteMap, workers, propertyMap, minUnits: CONFIG.minUnits,
@@ -163,6 +166,9 @@ async function runMonth({ monthKey, index, count, token, portal, siteMap, worker
 
   let filed = 0, failed = 0;
   const summary = [];
+  const toFile = results.filter(r => !r.skip && !(CONFIG.only.length && !CONFIG.only.includes(r.property)));
+  const before = { ...totals };
+  let n = 0;
   for (const r of results) {
     const line = `${r.status.padEnd(20)} ${r.region} / ${r.property} — ${r.note}`;
     if (r.skip || (CONFIG.only.length && !CONFIG.only.includes(r.property))) {
@@ -170,6 +176,8 @@ async function runMonth({ monthKey, index, count, token, portal, siteMap, worker
       summary.push({ ...r, scans: undefined, tourEvents: undefined, filed: false });
       continue;
     }
+    n++;
+    await reporter.line(`[${n}/${toFile.length}] ${r.property}`);
     await reporter.update({ currentProperty: r.property, progressMessage: `${monthLabel}${step}: filing ${r.property}` });
     try {
       let pdf = null;
@@ -178,11 +186,13 @@ async function runMonth({ monthKey, index, count, token, portal, siteMap, worker
         const parts = [];
         const formIds = [...new Set(r.scans.map(e => e.formID).filter(Boolean))];
         if (CONFIG.exportForms && formIds.length) {
+          await reporter.line(`📄 Downloading forms report (${formIds.length} form${formIds.length === 1 ? '' : 's'})...`);
           try {
             parts.push(...(await fetchFormsPdfs(token, formIds)));
           } catch (err) {
             if (err instanceof SessionExpiredError) throw err;
             console.warn(`     forms report not attached: ${err.message}`);
+            await reporter.line(`⚠️ Forms report not attached: ${err.message}`);
             r.note += ' (MyLoneWorkers forms report could not be attached; see the scraper log.)';
           }
         }
@@ -200,6 +210,8 @@ async function runMonth({ monthKey, index, count, token, portal, siteMap, worker
       if (r.xed) totals.failed++;
       if (pdf) totals.pdfs++;
       console.log(`  ${CONFIG.dryRun ? 'dry ' : 'filed'} ${line}${formsPages ? ` [+${formsPages} form pages]` : ''}`);
+      await reporter.line(`${STATUS_ICON[r.status] || '•'} ${r.property}: ${r.note}`);
+      if (pdf) await reporter.line(`✅ PDF filed (${(pdf.buffer.length / 1048576).toFixed(1)} MB${formsPages ? `, ${formsPages + 1} pages` : ''})`);
       summary.push({ region: r.region, property: r.property, status: r.status, checked: r.checked, xed: r.xed,
         note: r.note, units: r.units, onTimeUnits: r.onTimeUnits, inspectors: r.inspectors, pdf: pdf?.fileName ?? null, formsPages,
         filed: !CONFIG.dryRun });
@@ -208,6 +220,7 @@ async function runMonth({ monthKey, index, count, token, portal, siteMap, worker
       failed++;
       totals.errors++;
       console.warn(`  FAIL  ${line}\n        ${err.message}`);
+      await reporter.line(`❌ ${r.property}: could not be filed — ${err.message.slice(0, 300)}`);
       summary.push({ region: r.region, property: r.property, status: r.status, error: err.message, filed: false });
     }
     await reporter.update({ passed: totals.passed, failed: totals.failed, total: totals.total, pdfs: totals.pdfs });
@@ -215,7 +228,10 @@ async function runMonth({ monthKey, index, count, token, portal, siteMap, worker
 
   if (unmatchedSites.length) {
     console.warn('\nScans at sites that are not mapped to a portal property (add them to site-map.json):');
-    for (const u of unmatchedSites) console.warn(`  "${u.site}" — ${u.scans} scans by ${u.workers.join(', ')}`);
+    for (const u of unmatchedSites) {
+      console.warn(`  "${u.site}" — ${u.scans} scans by ${u.workers.join(', ')}`);
+      await reporter.line(`⚠️ Unmapped MyLoneWorkers site "${u.site}": ${u.scans} scans not credited to any property`);
+    }
   }
   if (unknownWorkers.length) {
     console.warn(`\nWorkers not in workers.json (their tours cannot be tied to a property): ${unknownWorkers.join(', ')}`);
@@ -228,6 +244,7 @@ async function runMonth({ monthKey, index, count, token, portal, siteMap, worker
   };
   fs.writeFileSync(path.join(CONFIG.outputDir, `results-${monthKey}.json`), JSON.stringify(monthResult, null, 2));
   console.log(`\n${monthLabel} done — ${Object.entries(counts).map(([k, v]) => `${v} ${k}`).join(', ')}. Filed ${filed}, failed ${failed}.`);
+  await reporter.line(`✅ ${monthLabel} done — ${totals.passed - before.passed} passed · ${totals.failed - before.failed} issues · ${totals.pdfs - before.pdfs} PDFs`);
   await reporter.update({ completedMonths: index + 1 });
   return monthResult;
 }
@@ -253,7 +270,9 @@ async function run() {
   const guardIds = workers.workers.map(w => w.id);
   fs.mkdirSync(CONFIG.outputDir, { recursive: true });
 
+  await reporter.line('🔐 Signing in to MyLoneWorkers...');
   const token = await borrowToken();
+  await reporter.line('✅ Signed in');
   const monthResults = [];
   for (const [index, monthKey] of months.entries()) {
     monthResults.push(await runMonth({ monthKey, index, count: months.length, token, portal, siteMap, workers, propertyMap, guardIds }));
@@ -265,6 +284,8 @@ async function run() {
   }, null, 2));
 
   const failedAny = totals.errors > 0;
+  await reporter.line(`━━━ Scraper complete ━━━`);
+  await reporter.line(`${failedAny ? '⚠️' : '✅'} ${totals.passed} passed · ${totals.failed} issues · ${totals.pdfs} PDFs${failedAny ? ` · ${totals.errors} could not be filed` : ''}`);
   await reporter.update({
     status: failedAny ? 'completed_with_errors' : 'completed',
     currentProperty: null,
@@ -282,6 +303,7 @@ run().catch(async err => {
     ? `${err.message}. Run \`npm run setup:session\` on the runner and sign in again.`
     : err.message;
   console.error(`\n${err instanceof SessionExpiredError ? '' : 'Fatal: '}${message}`);
+  await reporter.line(`❌ ${message}`);
   await reporter.update({ status: 'failed', currentProperty: null, errorMessage: message.slice(0, 4000),
     passed: totals.passed, failed: totals.failed, total: totals.total, pdfs: totals.pdfs });
   process.exit(1);

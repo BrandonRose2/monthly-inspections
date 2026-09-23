@@ -333,7 +333,7 @@ var systemRouter = router({
 });
 
 // server/db.ts
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/neon-http";
 
 // drizzle/schema.ts
@@ -406,6 +406,12 @@ var appSettings = pgTable("app_settings", {
   key: varchar("key", { length: 64 }).primaryKey(),
   value: text("value").notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdate(() => /* @__PURE__ */ new Date())
+});
+var scrapeRunLog = pgTable("scrape_run_log", {
+  id: serial("id").primaryKey(),
+  runId: integer("runId").notNull(),
+  line: text("line").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull()
 });
 
 // server/db.ts
@@ -652,7 +658,18 @@ async function listSavedRuns() {
 async function deleteRun(id) {
   const db = await getDb();
   if (!db) return;
+  await db.delete(scrapeRunLog).where(eq(scrapeRunLog.runId, id));
   await db.delete(scrapeRuns).where(eq(scrapeRuns.id, id));
+}
+async function appendRunLog(runId, lines) {
+  const db = await getDb();
+  if (!db || !lines.length) return;
+  await db.insert(scrapeRunLog).values(lines.map((line) => ({ runId, line })));
+}
+async function getRunLog(runId, afterId = 0, limit = 1e3) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select({ id: scrapeRunLog.id, line: scrapeRunLog.line }).from(scrapeRunLog).where(and(eq(scrapeRunLog.runId, runId), gt(scrapeRunLog.id, afterId))).orderBy(asc(scrapeRunLog.id)).limit(limit);
 }
 async function getSetting(key) {
   const db = await getDb();
@@ -1087,8 +1104,10 @@ var appRouter = router({
       } catch (err) {
         const message = err instanceof DispatchError ? err.message : `Could not reach GitHub: ${err.message}`;
         await updateRun(run.id, { status: "failed", errorMessage: message, completedAt: /* @__PURE__ */ new Date() });
+        await appendRunLog(run.id, [`\u274C ${message}`]);
         throw new TRPCError3({ code: "PRECONDITION_FAILED", message });
       }
+      await appendRunLog(run.id, [`\u{1F680} Started "${run.label}"`, "\u23F3 Waiting for the Mac runner to pick up the job\u2026"]);
       return await updateRun(run.id, { progressMessage: "Waiting for the Mac runner to pick up the job\u2026" }) ?? run;
     }),
     rename: publicProcedure.input(z2.object({ id: z2.number().int(), label: z2.string().trim().min(1).max(255) })).mutation(async ({ input }) => updateRun(input.id, { label: input.label })),
@@ -1130,13 +1149,21 @@ var appRouter = router({
       failed: z2.number().int().min(0).optional(),
       total: z2.number().int().min(0).optional(),
       pdfs: z2.number().int().min(0).optional(),
-      errorMessage: z2.string().max(4e3).nullable().optional()
+      errorMessage: z2.string().max(4e3).nullable().optional(),
+      // Console lines for the live log view, appended in order.
+      log: z2.array(z2.string().max(1e3)).max(500).optional()
     })).mutation(async ({ input }) => {
-      const { id, ...patch } = input;
+      const { id, log, ...patch } = input;
       const done = patch.status && patch.status !== "running";
       const run = await updateRun(id, { ...patch, ...done ? { completedAt: /* @__PURE__ */ new Date() } : {} });
       if (!run) throw new TRPCError3({ code: "NOT_FOUND", message: "Run not found" });
+      if (log?.length) await appendRunLog(id, log);
       return { success: true };
+    }),
+    // The live console for one run; poll with the last id you have.
+    log: publicProcedure.input(z2.object({ runId: z2.number().int(), afterId: z2.number().int().min(0).default(0) })).query(async ({ input }) => {
+      const [run, lines] = await Promise.all([getRun(input.runId), getRunLog(input.runId, input.afterId)]);
+      return { run: run ? withStaleStatus(run) : null, lines };
     })
   })
 });
@@ -1551,6 +1578,13 @@ var SCHEMA_STATEMENTS = [
     "completedAt" timestamp,
     "updatedAt" timestamp DEFAULT now() NOT NULL
   )`,
+  sql`CREATE TABLE IF NOT EXISTS "scrape_run_log" (
+    "id" serial PRIMARY KEY NOT NULL,
+    "runId" integer NOT NULL,
+    "line" text NOT NULL,
+    "createdAt" timestamp DEFAULT now() NOT NULL
+  )`,
+  sql`CREATE INDEX IF NOT EXISTS "scrape_run_log_run_idx" ON "scrape_run_log" ("runId", "id")`,
   sql`CREATE TABLE IF NOT EXISTS "app_settings" (
     "key" varchar(64) PRIMARY KEY NOT NULL,
     "value" text NOT NULL,

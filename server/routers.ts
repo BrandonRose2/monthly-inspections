@@ -5,7 +5,7 @@ import { z } from "zod";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { machineProcedure, publicProcedure, router } from "./_core/trpc";
-import { createRun, deleteRun, getRun, getSetting, listRuns, listSavedRuns, setSetting, updateRun } from "./db";
+import { appendRunLog, createRun, deleteRun, getRun, getRunLog, getSetting, listRuns, listSavedRuns, setSetting, updateRun } from "./db";
 import { dispatchScrape, DispatchError } from "./github";
 import { deleteAllRecords, deleteMonthRecords, getHistorySummary, getMonthRecords, getRepeatOffenders, getSavedMonthKeys, setInspectionResult, upsertInspectionRecord } from "./db";
 import { FILES_ROUTE, storagePut } from "./storage";
@@ -361,8 +361,10 @@ export const appRouter = router({
         } catch (err) {
           const message = err instanceof DispatchError ? err.message : `Could not reach GitHub: ${(err as Error).message}`;
           await updateRun(run.id, { status: "failed", errorMessage: message, completedAt: new Date() });
+          await appendRunLog(run.id, [`❌ ${message}`]);
           throw new TRPCError({ code: "PRECONDITION_FAILED", message });
         }
+        await appendRunLog(run.id, [`🚀 Started "${run.label}"`, "⏳ Waiting for the Mac runner to pick up the job…"]);
         return (await updateRun(run.id, { progressMessage: "Waiting for the Mac runner to pick up the job…" })) ?? run;
       }),
 
@@ -420,13 +422,24 @@ export const appRouter = router({
         total: z.number().int().min(0).optional(),
         pdfs: z.number().int().min(0).optional(),
         errorMessage: z.string().max(4000).nullable().optional(),
+        // Console lines for the live log view, appended in order.
+        log: z.array(z.string().max(1000)).max(500).optional(),
       }))
       .mutation(async ({ input }) => {
-        const { id, ...patch } = input;
+        const { id, log, ...patch } = input;
         const done = patch.status && patch.status !== "running";
         const run = await updateRun(id, { ...patch, ...(done ? { completedAt: new Date() } : {}) });
         if (!run) throw new TRPCError({ code: "NOT_FOUND", message: "Run not found" });
+        if (log?.length) await appendRunLog(id, log);
         return { success: true };
+      }),
+
+    // The live console for one run; poll with the last id you have.
+    log: publicProcedure
+      .input(z.object({ runId: z.number().int(), afterId: z.number().int().min(0).default(0) }))
+      .query(async ({ input }) => {
+        const [run, lines] = await Promise.all([getRun(input.runId), getRunLog(input.runId, input.afterId)]);
+        return { run: run ? withStaleStatus(run) : null, lines };
       }),
   }),
 });

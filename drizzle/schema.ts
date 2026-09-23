@@ -85,3 +85,11 @@ export const appSettings = pgTable("app_settings", {
   value: text("value").notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdate(() => new Date()),
 });
+
+// Live console lines for a run (the "Run Scraper" log view).
+export const scrapeRunLog = pgTable("scrape_run_log", {
+  id: serial("id").primaryKey(),
+  runId: integer("runId").notNull(),
+  line: text("line").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});

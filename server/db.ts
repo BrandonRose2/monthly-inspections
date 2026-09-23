@@ -1,6 +1,6 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/neon-http";
-import { appSettings, inspectionRecords, InsertInspectionRecord, InsertUser, scrapeRuns, ScrapeRun, users } from "../drizzle/schema";
+import { appSettings, inspectionRecords, InsertInspectionRecord, InsertUser, scrapeRunLog, scrapeRuns, ScrapeRun, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -381,7 +381,26 @@ export async function listSavedRuns(): Promise<ScrapeRun[]> {
 export async function deleteRun(id: number): Promise<void> {
   const db = await getDb();
   if (!db) return;
+  await db.delete(scrapeRunLog).where(eq(scrapeRunLog.runId, id));
   await db.delete(scrapeRuns).where(eq(scrapeRuns.id, id));
+}
+
+export async function appendRunLog(runId: number, lines: string[]): Promise<void> {
+  const db = await getDb();
+  if (!db || !lines.length) return;
+  await db.insert(scrapeRunLog).values(lines.map(line => ({ runId, line })));
+}
+
+/** Log lines after `afterId`, oldest first. */
+export async function getRunLog(runId: number, afterId = 0, limit = 1000) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select({ id: scrapeRunLog.id, line: scrapeRunLog.line })
+    .from(scrapeRunLog)
+    .where(and(eq(scrapeRunLog.runId, runId), gt(scrapeRunLog.id, afterId)))
+    .orderBy(asc(scrapeRunLog.id))
+    .limit(limit);
 }
 
 // ── Settings ──────────────────────────────────────────────────────────────────

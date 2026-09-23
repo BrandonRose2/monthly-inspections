@@ -58,6 +58,28 @@ test('a portal-started range run reports progress for every month and files resu
   assert.equal(last.passed, filed.filter(c => c.json.checked).length);
 });
 
+test('streams a readable console log to the portal', () => {
+  const { status, calls, stderr } = scrape({ RUN_ID: '21', MONTH: '2026-09', ONLY: 'Breckenridge Village,Coral Village' });
+  assert.equal(status, 0, stderr);
+  const lines = calls.filter(c => c.procedure === 'scraper.progress').flatMap(c => c.json.log || []);
+  assert.deepEqual(lines.slice(0, 3), ['🔐 Signing in to MyLoneWorkers...', '✅ Signed in', '━━━ Starting September 2026 ━━━']);
+  assert.ok(lines.includes('[2/2] Breckenridge Village'));
+  assert.ok(lines.some(l => l.startsWith('✅ Breckenridge Village: 8 units scanned')));
+  assert.ok(lines.some(l => /^✅ PDF filed \(\d+\.\d MB/.test(l)));
+  assert.ok(lines.includes('[1/2] Coral Village'));
+  assert.ok(lines.some(l => l.startsWith('❌ Coral Village: No MyLoneWorkers activity')));
+  assert.equal(lines.at(-2), '━━━ Scraper complete ━━━');
+  assert.match(lines.at(-1), /^✅ 1 passed · 1 issues · 1 PDFs$/);
+  // Every line reaches the portal exactly once, in order.
+  assert.equal(new Set(lines).size, lines.length);
+});
+
+test('a session failure ends the log with the fix', () => {
+  const { calls } = scrape({ RUN_ID: '22', MONTH: '2026-09', FAKE_MLW_STATUS: '401' });
+  const lines = calls.filter(c => c.procedure === 'scraper.progress').flatMap(c => c.json.log || []);
+  assert.match(lines.at(-1), /^❌ .*setup:session/);
+});
+
 test('falls back to base64 when the portal has no upload route yet', () => {
   const { status, calls, stderr } = scrape({ RUN_ID: '4', MONTH: '2026-09', ONLY: 'Breckenridge Village', FAKE_NO_UPLOAD: '1' });
   assert.equal(status, 0, stderr);

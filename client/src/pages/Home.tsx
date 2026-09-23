@@ -3,7 +3,7 @@ import { trpc } from "@/lib/trpc";
 import { Printer, RotateCcw, Mail, X as XIcon, Copy, Check, FileText, Upload, Eye, Trash2, ChevronLeft, ChevronRight, ClipboardList, GitCompare, Download, FolderOpen, History, TrendingUp, TrendingDown, Minus, CheckCircle2, XCircle, FileBarChart2, Play, FlaskConical, Tag, BellRing, Bookmark } from "lucide-react";
 import { applyNamingTemplate, CONTACT_BY_PROPERTY, DEFAULT_NAMING, MONTH_NAMES, NamingSettings, NOT_ON_MYLONEWORKERS, PropertyContact, REGIONS, TOTAL_PROPERTIES } from "@shared/properties";
 import { downloadReportPdf } from "@/lib/reportPdf";
-import { NamingModal, PreDueModal, RunScraperModal, SavedRunsModal, ScrapeActivityPanel, TestMappingsModal, UnmappedBanner, useNaming, useScrapeActivity } from "./ScraperPanels";
+import { NamingModal, PreDueModal, RunConsoleModal, RunScraperModal, SavedRunsModal, ScrapeActivityPanel, TestMappingsModal, UnmappedBanner, useNaming, useScrapeActivity } from "./ScraperPanels";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -120,6 +120,8 @@ export default function Home() {
 
   const utils = trpc.useUtils();
   const [panel, setPanel] = useState<null | "run" | "test" | "saved" | "naming" | "predue">(null);
+  const [consoleRunId, setConsoleRunId] = useState<number | null>(null);
+  const showConsole = (runId: number) => { setPanel(null); setConsoleRunId(runId); activity.refetch(); };
   const naming = useNaming();
   const activity = useScrapeActivity(() => { refetchCurrent(); refetchMonths(); utils.inspections.getMonth.invalidate(); utils.scraper.savedRuns.invalidate(); });
   const running = activity.active.length > 0;
@@ -532,7 +534,7 @@ export default function Home() {
       </header>
 
       <UnmappedBanner />
-      <ScrapeActivityPanel runs={activity.runs as any} active={activity.active as any} />
+      <ScrapeActivityPanel runs={activity.runs as any} active={activity.active as any} onViewLog={setConsoleRunId} />
 
       {/* ── Legend ── */}
       <div className="max-w-6xl mx-auto px-6 pt-3 pb-1 print:hidden">
@@ -592,8 +594,9 @@ export default function Home() {
         />
       )}
 
-      {panel === "run" && <RunScraperModal onClose={() => setPanel(null)} onStarted={() => activity.refetch()} />}
-      {panel === "test" && <TestMappingsModal onClose={() => setPanel(null)} onStarted={() => activity.refetch()} />}
+      {panel === "run" && <RunScraperModal onClose={() => setPanel(null)} onStarted={showConsole} />}
+      {panel === "test" && <TestMappingsModal onClose={() => setPanel(null)} onStarted={showConsole} />}
+      {consoleRunId !== null && <RunConsoleModal runId={consoleRunId} onClose={() => setConsoleRunId(null)} />}
       {panel === "saved" && <SavedRunsModal onClose={() => setPanel(null)} onOpenMonth={openMonth} />}
       {panel === "naming" && <NamingModal onClose={() => setPanel(null)} currentMonthKey={mk} />}
       {panel === "predue" && <PreDueModal status={mergedState} monthLabel={monthLabel} onClose={() => setPanel(null)} />}

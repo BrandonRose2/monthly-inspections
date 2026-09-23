@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const store = vi.hoisted(() => ({ runs: [] as any[], settings: {} as Record<string, unknown>, nextId: 1 }));
+const store = vi.hoisted(() => ({ runs: [] as any[], settings: {} as Record<string, unknown>, nextId: 1, log: [] as { id: number; runId: number; line: string }[] }));
 
 vi.mock("./db", async (orig) => ({
   ...(await orig<typeof import("./db")>()),
@@ -21,6 +21,8 @@ vi.mock("./db", async (orig) => ({
   listRuns: vi.fn(async () => store.runs),
   listSavedRuns: vi.fn(async () => store.runs.filter(r => r.status.startsWith("completed"))),
   deleteRun: vi.fn(async (id: number) => { store.runs = store.runs.filter(r => r.id !== id); }),
+  appendRunLog: vi.fn(async (runId: number, lines: string[]) => { for (const line of lines) store.log.push({ id: store.log.length + 1, runId, line }); }),
+  getRunLog: vi.fn(async (runId: number, afterId = 0) => store.log.filter(l => l.runId === runId && l.id > afterId).map(({ id, line }) => ({ id, line }))),
   getSetting: vi.fn(async (k: string) => (store.settings[k] as any) ?? null),
   setSetting: vi.fn(async (k: string, v: unknown) => { store.settings[k] = v; }),
 }));
@@ -44,6 +46,7 @@ beforeEach(() => {
   store.runs = [];
   store.settings = {};
   store.nextId = 1;
+  store.log = [];
   process.env.INGEST_TOKEN = "test-token-123";
   process.env.GITHUB_TOKEN = "gh-token";
   fetchMock.mockReset().mockResolvedValue(new Response(null, { status: 204 }));
@@ -139,6 +142,27 @@ describe("scraper.begin / progress (machine calls)", () => {
   it("create a run for a scheduled scrape", async () => {
     const { id } = await machine().scraper.begin({ startMonthKey: "2026-09", endMonthKey: "2026-09" });
     expect(store.runs.find(r => r.id === id)).toMatchObject({ kind: "scheduled", status: "running", label: "Scheduled run — September 2026" });
+  });
+});
+
+describe("scraper.log", () => {
+  it("collects the start lines and the scraper's console, and pages by id", async () => {
+    const run = await ui().scraper.start({ startMonthKey: "2026-09", endMonthKey: "2026-09" });
+    await machine().scraper.progress({ id: run.id, log: ["🔐 Signing in to MyLoneWorkers...", "✅ Signed in"] });
+    const all = await ui().scraper.log({ runId: run.id });
+    expect(all.lines.map(l => l.line)).toEqual([
+      `🚀 Started "${run.label}"`, "⏳ Waiting for the Mac runner to pick up the job…", "🔐 Signing in to MyLoneWorkers...", "✅ Signed in",
+    ]);
+    expect(all.run?.status).toBe("queued");
+    const more = await ui().scraper.log({ runId: run.id, afterId: all.lines[1].id });
+    expect(more.lines.map(l => l.line)).toEqual(["🔐 Signing in to MyLoneWorkers...", "✅ Signed in"]);
+  });
+
+  it("records why a run could not start", async () => {
+    delete process.env.GITHUB_TOKEN;
+    await expect(ui().scraper.start({ startMonthKey: "2026-09", endMonthKey: "2026-09" })).rejects.toThrow();
+    const { lines } = await ui().scraper.log({ runId: store.runs[0].id });
+    expect(lines[0].line).toMatch(/^❌ .*GITHUB_TOKEN/);
   });
 });
 

@@ -29,6 +29,13 @@ export const SCHEMA_STATEMENTS = [
     "completedAt" timestamp,
     "updatedAt" timestamp DEFAULT now() NOT NULL
   )`,
+  sql`CREATE TABLE IF NOT EXISTS "scrape_run_log" (
+    "id" serial PRIMARY KEY NOT NULL,
+    "runId" integer NOT NULL,
+    "line" text NOT NULL,
+    "createdAt" timestamp DEFAULT now() NOT NULL
+  )`,
+  sql`CREATE INDEX IF NOT EXISTS "scrape_run_log_run_idx" ON "scrape_run_log" ("runId", "id")`,
   sql`CREATE TABLE IF NOT EXISTS "app_settings" (
     "key" varchar(64) PRIMARY KEY NOT NULL,
     "value" text NOT NULL,
