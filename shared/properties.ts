@@ -1,6 +1,8 @@
 // Portal properties, contacts and MyLoneWorkers coverage — one source for the
 // portal UI, the server and (via scraper/test/portal-properties.test.js) the
-// scraper. Names match the Manus-hosted portal as of Sept 2026.
+// scraper. Names match the Manus-hosted portal; regions follow the ApartmentCorp
+// Property Directory (Sept 2026), plus Silver Springs and Thomasville in
+// Region 1 as Brandon confirmed.
 
 export interface Region {
   name: string;
@@ -8,10 +10,10 @@ export interface Region {
 }
 
 export const REGIONS: Region[] = [
-  { name: "Region 1", properties: ["Arbor Crest", "Boca Ciega", "Coral Village", "Jefferson Arms Apts", "Macedonia Garden Apts", "Opa Lock 135th St Apts", "River Pointe", "Silver Springs", "Thomasville"] },
-  { name: "Region 2", properties: ["Breckenridge Village", "Crossroads", "Cumberland Apts", "Grace Townhomes", "Grove Park Terrace", "Holiday Apts", "La Promesa", "Lexington", "Walnut Hill"] },
-  { name: "Region 3", properties: ["Bayou Pointe", "The Gates on Manhattan", "Howell Place", "Marrero 3", "North Pointe", "Pelican Bay", "Pirates Bend", "Ruby Diamond", "St. Charles", "Star Homes", "Thibodaux Colonial Estates", "Windsor / Yorkshire"] },
-  { name: "Region 4", properties: ["Anaheim Apts", "Columbia Village Apts", "Fairfax", "Forest View", "Granite Ridge", "Midtown Manor", "Oak Hills", "Pacific Pointe Apts", "River Garden", "Central Apts / Urban Rehab", "New Wilmington Arms"] },
+  { name: "Region 1", properties: ["Boca Ciega", "Coral Village", "Cumberland Apts", "Holiday Apts", "Jefferson Arms Apts", "Macedonia Garden Apts", "Opa Lock 135th St Apts", "Silver Springs", "Thomasville", "Walnut Hill"] },
+  { name: "Region 2", properties: ["Breckenridge Village", "Crossroads", "Grace Townhomes", "Grove Park Terrace", "La Promesa", "Lexington", "River Pointe"] },
+  { name: "Region 3", properties: ["Arbor Crest", "Bayou Pointe", "The Gates on Manhattan", "Howell Place", "Marrero 3", "North Pointe", "Pelican Bay", "Pirates Bend", "Ruby Diamond", "St. Charles", "Star Homes", "Thibodaux Colonial Estates", "Windsor / Yorkshire"] },
+  { name: "Region 4", properties: ["Anaheim Apts", "Central Apts / Urban Rehab", "Columbia Village Apts", "Fairfax", "Forest View", "Granite Ridge", "Midtown Manor", "New Wilmington Arms", "Oak Hills", "Pacific Pointe Apts", "River Garden"] },
 ];
 
 export const TOTAL_PROPERTIES = REGIONS.reduce((n, r) => n + r.properties.length, 0);
@@ -54,72 +56,78 @@ export interface PropertyContact {
   manager: string;
   email: string;
   ext: string;
-  /** Region in the Company Contacts list; decides which regional manager is reminded. */
   region: string;
   regionalManager: string;
   regionalEmail: string;
 }
 
-/** Regional managers, from Notion "Company Contacts" (Managers & Assistants list, 2026-09-17). */
+/** Regional manager for each portal region (Region 1 reminders also go to Leslie; see REGIONAL_OVERRIDES). */
 export const REGIONAL_MANAGERS: Record<string, { regionalManager: string; regionalEmail: string }> = {
   "Region 1": { regionalManager: "JR Rolon", regionalEmail: "jrrolon@apartmentcorp.com" },
   "Region 2": { regionalManager: "Leslie Rolon", regionalEmail: "leslie@apartmentcorp.com" },
   "Region 3": { regionalManager: "Ginger Positerry", regionalEmail: "ginger@apartmentcorp.com" },
   "Region 4": { regionalManager: "Blake Weddington", regionalEmail: "blake@apartmentcorp.com" },
-  "Region 5": { regionalManager: "Johann Armstead", regionalEmail: "johann@apartmentcorp.com" },
 };
 
-const c = (property: string, manager: string, email: string, ext: string, region: string): PropertyContact => ({
-  property, manager, email, ext, region, ...REGIONAL_MANAGERS[region],
-});
+const regionOfProperty = (property: string) => {
+  const r = REGIONS.find(x => x.properties.includes(property));
+  if (!r) throw new Error(`Contact for unknown property: ${property}`);
+  return r.name;
+};
+
+// Region comes from REGIONS, so the checklist and the reminders always agree.
+const c = (property: string, manager: string, email: string, ext: string): PropertyContact => {
+  const region = regionOfProperty(property);
+  return { property, manager, email, ext, region, ...REGIONAL_MANAGERS[region] };
+};
 
 /**
- * One row per portal property, from Notion "Company Contacts" (the property's
- * own row, not its assistant or leasing rows). Blank manager = none listed in
+ * One row per portal property. Names, emails and extensions from Notion
+ * "Company Contacts" (the property's own row, not its assistant or leasing rows). Blank manager = none listed in
  * Notion. Properties that ring New Wilmington Arms have no email of their own.
  */
 export const CONTACTS: PropertyContact[] = [
-  c("Arbor Crest", "Erica Finch", "arborcrest@apartmentcorp.com", "261", "Region 1"),
-  c("Boca Ciega", "Katrina Weekly", "katrina@apartmentcorp.com", "216", "Region 1"),
-  c("Coral Village", "Keyla Maranon", "coralvillage@apartmentcorp.com", "251", "Region 1"),
-  c("Jefferson Arms Apts", "Brandy Amador", "jefferson@apartmentcorp.com", "236", "Region 1"),
-  c("Macedonia Garden Apts", "Erika Scales", "macedonia@apartmentcorp.com", "222", "Region 1"),
-  c("Opa Lock 135th St Apts", "Rosa Villarroel", "opa@apartmentcorp.com", "221", "Region 1"),
-  c("River Pointe", "Stephanie Delong", "stephanie@apartmentcorp.com", "224", "Region 4"),
-  c("Silver Springs", "Tarshia Pierce", "silversprings@apartmentcorp.com", "245", "Region 5"),
-  c("Thomasville", "Adrienne McCall", "thomasville@apartmentcorp.com", "295", "Region 5"),
-  c("Breckenridge Village", "", "lexingtonasst@apartmentcorp.com", "238", "Region 2"),
-  c("Crossroads", "Jennifer Parks", "crossroads@apartmentcorp.com", "273", "Region 2"),
-  c("Cumberland Apts", "Kiara Brown", "cumberland@apartmentcorp.com", "219", "Region 1"),
-  c("Grace Townhomes", "Susan Lopez", "susan@apartmentcorp.com", "227", "Region 2"),
-  c("Grove Park Terrace", "Nikki Moreno", "grovepark@apartmentcorp.com", "265", "Region 2"),
-  c("Holiday Apts", "Arlene Vinson", "holiday@apartmentcorp.com", "235", "Region 1"),
-  c("La Promesa", "Ashley Clay", "lapromesa@apartmentcorp.com", "269", "Region 2"),
-  c("Lexington", "", "lexingtonasst@apartmentcorp.com", "239", "Region 2"),
-  c("Walnut Hill", "", "walnut@apartmentcorp.com", "267", "Region 5"),
-  c("Bayou Pointe", "", "bayou@apartmentcorp.com", "298", "Region 3"),
-  c("The Gates on Manhattan", "Lindgret Celestine", "lindgret@apartmentcorp.com", "284", "Region 3"),
-  c("Howell Place", "Valencia Patterson", "howell@apartmentcorp.com", "259", "Region 3"),
-  c("Marrero 3", "Ketorah Parks", "rubystarmanager@apartmentcorp.com", "283", "Region 3"),
-  c("North Pointe", "", "northpointe@apartmentcorp.com", "297", "Region 3"),
-  c("Pelican Bay", "Dequanta Sutherland", "pelican@apartmentcorp.com", "257", "Region 3"),
-  c("Pirates Bend", "Valencia Patterson", "pirates@apartmentcorp.com", "260", "Region 3"),
-  c("Ruby Diamond", "Ketorah Parks", "rubystarmanager@apartmentcorp.com", "286", "Region 3"),
-  c("St. Charles", "Deon Tolliver", "stcharles@apartmentcorp.com", "255", "Region 3"),
-  c("Star Homes", "Ketorah Parks", "rubystarmanager@apartmentcorp.com", "286", "Region 3"),
-  c("Thibodaux Colonial Estates", "Susie Rogers", "colonialleasing@apartmentcorp.com", "228/229", "Region 3"),
-  c("Windsor / Yorkshire", "Kimberly Powell", "windsor@apartmentcorp.com", "291", "Region 3"),
-  c("Anaheim Apts", "Priscilla Walters", "priscilla@apartmentcorp.com", "212", "Region 4"),
-  c("Columbia Village Apts", "Tammy Davis", "tammy@apartmentcorp.com", "275", "Region 4"),
-  c("Fairfax", "Shraga Kurs", "", "", "Region 4"),
-  c("Forest View", "Tammy / Heather", "tammy@apartmentcorp.com", "277", "Region 4"),
-  c("Granite Ridge", "James Abeyta", "james@apartmentcorp.com", "242", "Region 4"),
-  c("Midtown Manor", "Steve Rand", "", "", "Region 4"),
-  c("Oak Hills", "Heather Hein", "heatherh@apartmentcorp.com", "279", "Region 4"),
-  c("Pacific Pointe Apts", "Hailey Huber", "pacificpointe@apartmentcorp.com", "243", "Region 4"),
-  c("River Garden", "Heather Snyder", "rivergarden@apartmentcorp.com", "252", "Region 4"),
-  c("Central Apts / Urban Rehab", "Amunique Cannon", "", "", "Region 4"),
-  c("New Wilmington Arms", "Jose Gomez", "wilmington@apartmentcorp.com", "211", "Region 4"),
+  c("Arbor Crest", "Erica Finch", "arborcrest@apartmentcorp.com", "261"),
+  c("Boca Ciega", "Katrina Weekly", "katrina@apartmentcorp.com", "216"),
+  c("Coral Village", "Keyla Maranon", "coralvillage@apartmentcorp.com", "251"),
+  c("Jefferson Arms Apts", "Brandy Amador", "jefferson@apartmentcorp.com", "236"),
+  c("Macedonia Garden Apts", "Erika Scales", "macedonia@apartmentcorp.com", "222"),
+  c("Opa Lock 135th St Apts", "Rosa Villarroel", "opa@apartmentcorp.com", "221"),
+  c("River Pointe", "Stephanie Delong", "stephanie@apartmentcorp.com", "224"),
+  c("Silver Springs", "Tarshia Pierce", "silversprings@apartmentcorp.com", "245"),
+  c("Thomasville", "Adrienne McCall", "thomasville@apartmentcorp.com", "295"),
+  c("Breckenridge Village", "", "lexingtonasst@apartmentcorp.com", "238"),
+  c("Crossroads", "Jennifer Parks", "crossroads@apartmentcorp.com", "273"),
+  c("Cumberland Apts", "Kiara Brown", "cumberland@apartmentcorp.com", "219"),
+  c("Grace Townhomes", "Susan Lopez", "susan@apartmentcorp.com", "227"),
+  c("Grove Park Terrace", "Nikki Moreno", "grovepark@apartmentcorp.com", "265"),
+  c("Holiday Apts", "Arlene Vinson", "holiday@apartmentcorp.com", "235"),
+  c("La Promesa", "Ashley Clay", "lapromesa@apartmentcorp.com", "269"),
+  c("Lexington", "", "lexingtonasst@apartmentcorp.com", "239"),
+  c("Walnut Hill", "", "walnut@apartmentcorp.com", "267"),
+  c("Bayou Pointe", "", "bayou@apartmentcorp.com", "298"),
+  c("The Gates on Manhattan", "Lindgret Celestine", "lindgret@apartmentcorp.com", "284"),
+  c("Howell Place", "Valencia Patterson", "howell@apartmentcorp.com", "259"),
+  c("Marrero 3", "Ketorah Parks", "rubystarmanager@apartmentcorp.com", "283"),
+  c("North Pointe", "", "northpointe@apartmentcorp.com", "297"),
+  c("Pelican Bay", "Dequanta Sutherland", "pelican@apartmentcorp.com", "257"),
+  c("Pirates Bend", "Valencia Patterson", "pirates@apartmentcorp.com", "260"),
+  c("Ruby Diamond", "Ketorah Parks", "rubystarmanager@apartmentcorp.com", "286"),
+  c("St. Charles", "Deon Tolliver", "stcharles@apartmentcorp.com", "255"),
+  c("Star Homes", "Ketorah Parks", "rubystarmanager@apartmentcorp.com", "286"),
+  c("Thibodaux Colonial Estates", "Susie Rogers", "colonialleasing@apartmentcorp.com", "228/229"),
+  c("Windsor / Yorkshire", "Kimberly Powell", "windsor@apartmentcorp.com", "291"),
+  c("Anaheim Apts", "Priscilla Walters", "priscilla@apartmentcorp.com", "212"),
+  c("Columbia Village Apts", "Tammy Davis", "tammy@apartmentcorp.com", "275"),
+  c("Fairfax", "Shraga Kurs", "", ""),
+  c("Forest View", "Tammy / Heather", "tammy@apartmentcorp.com", "277"),
+  c("Granite Ridge", "James Abeyta", "james@apartmentcorp.com", "242"),
+  c("Midtown Manor", "Steve Rand", "", ""),
+  c("Oak Hills", "Heather Hein", "heatherh@apartmentcorp.com", "279"),
+  c("Pacific Pointe Apts", "Hailey Huber", "pacificpointe@apartmentcorp.com", "243"),
+  c("River Garden", "Heather Snyder", "rivergarden@apartmentcorp.com", "252"),
+  c("Central Apts / Urban Rehab", "Amunique Cannon", "", ""),
+  c("New Wilmington Arms", "Jose Gomez", "wilmington@apartmentcorp.com", "211"),
 ];
 
 export const CONTACT_BY_PROPERTY: Record<string, PropertyContact> = Object.fromEntries(CONTACTS.map(x => [x.property, x]));
@@ -143,7 +151,7 @@ export interface ReminderDraft {
 }
 
 /**
- * Pre-due reminders to regional managers: one per contact region, listing
+ * Pre-due reminders to regional managers: one per region, listing
  * every property not yet marked complete (checked and not ✗). Wording is the
  * Manus portal's, unchanged.
  */

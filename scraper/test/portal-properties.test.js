@@ -37,3 +37,10 @@ test('every mapping file points at a real portal property', () => {
   ];
   assert.deepEqual(targets.filter(p => !all.has(p)), []);
 });
+
+test('property-map regions match the portal region of each property', () => {
+  const regionOf = Object.fromEntries(Object.entries(mine.regions).flatMap(([r, ps]) => ps.map(p => [p, r])));
+  const pm = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'property-map.json'), 'utf8'));
+  const dests = [...Object.values(pm.confirmed), ...Object.values(pm.needs_confirmation)].flat().filter(Boolean);
+  assert.deepEqual(dests.filter(d => regionOf[d.property] !== d.region), []);
+});

@@ -2,28 +2,28 @@
   "_comment": "Mirror of REGIONS, NOT_ON_MYLONEWORKERS and LEGACY_PROPERTY_NAMES in shared/properties.ts. test/portal-properties.test.js fails if they drift apart. aliases: earlier short names, still used to match MyLoneWorkers site names.",
   "regions": {
     "Region 1": [
-      "Arbor Crest",
       "Boca Ciega",
       "Coral Village",
+      "Cumberland Apts",
+      "Holiday Apts",
       "Jefferson Arms Apts",
       "Macedonia Garden Apts",
       "Opa Lock 135th St Apts",
-      "River Pointe",
       "Silver Springs",
-      "Thomasville"
+      "Thomasville",
+      "Walnut Hill"
     ],
     "Region 2": [
       "Breckenridge Village",
       "Crossroads",
-      "Cumberland Apts",
       "Grace Townhomes",
       "Grove Park Terrace",
-      "Holiday Apts",
       "La Promesa",
       "Lexington",
-      "Walnut Hill"
+      "River Pointe"
     ],
     "Region 3": [
+      "Arbor Crest",
       "Bayou Pointe",
       "The Gates on Manhattan",
       "Howell Place",
@@ -39,16 +39,16 @@
     ],
     "Region 4": [
       "Anaheim Apts",
+      "Central Apts / Urban Rehab",
       "Columbia Village Apts",
       "Fairfax",
       "Forest View",
       "Granite Ridge",
       "Midtown Manor",
+      "New Wilmington Arms",
       "Oak Hills",
       "Pacific Pointe Apts",
-      "River Garden",
-      "Central Apts / Urban Rehab",
-      "New Wilmington Arms"
+      "River Garden"
     ]
   },
   "not_on_myloneworkers": [

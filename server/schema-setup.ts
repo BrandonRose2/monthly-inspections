@@ -1,8 +1,8 @@
-// Creates the tables added after the first migration and renames records
-// filed under the old short property names. Runs once at server start; every
+// Creates the tables added after the first migration, renames records filed
+// under the old short property names and moves records to current regions. Runs once at server start; every
 // statement is idempotent, so restarts and concurrent instances are safe.
 import { sql } from "drizzle-orm";
-import { LEGACY_PROPERTY_NAMES } from "@shared/properties";
+import { LEGACY_PROPERTY_NAMES, REGIONS } from "@shared/properties";
 import { getDb } from "./db";
 
 export const SCHEMA_STATEMENTS = [
@@ -48,12 +48,29 @@ export function renameStatements() {
   );
 }
 
+/**
+ * Move each property's records into its current region (regions were
+ * regrouped to the Property Directory in Sept 2026), skipping months that
+ * already have a record in the new region.
+ */
+export function regionMoveStatements() {
+  return REGIONS.flatMap(r =>
+    r.properties.map(property => sql`UPDATE "inspection_records" AS rec SET "region" = ${r.name}
+      WHERE rec."property" = ${property} AND rec."region" <> ${r.name}
+        AND NOT EXISTS (
+          SELECT 1 FROM "inspection_records" AS n
+          WHERE n."monthKey" = rec."monthKey" AND n."region" = ${r.name} AND n."property" = ${property}
+        )`),
+  );
+}
+
 export async function ensureSchema() {
   const db = await getDb();
   if (!db) return;
   try {
     for (const s of SCHEMA_STATEMENTS) await db.execute(s);
     for (const s of renameStatements()) await db.execute(s);
+    for (const s of regionMoveStatements()) await db.execute(s);
     console.log("[Database] schema ready");
   } catch (err) {
     console.error("[Database] schema setup failed:", err);

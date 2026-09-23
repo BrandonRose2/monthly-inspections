@@ -11,7 +11,7 @@
   ],
   "confirmed": {
     "Arbor Crest": {
-      "region": "Region 1",
+      "region": "Region 3",
       "property": "Arbor Crest"
     },
     "Boca Ciega": {
@@ -39,7 +39,7 @@
       "property": "Crossroads"
     },
     "Cumberland Apts": {
-      "region": "Region 2",
+      "region": "Region 1",
       "property": "Cumberland Apts"
     },
     "Grace Townhomes": {
@@ -47,7 +47,7 @@
       "property": "Grace Townhomes"
     },
     "Holiday Apts": {
-      "region": "Region 2",
+      "region": "Region 1",
       "property": "Holiday Apts"
     },
     "La Promesa": {
@@ -59,7 +59,7 @@
       "property": "Lexington"
     },
     "Walnut Hill": {
-      "region": "Region 2",
+      "region": "Region 1",
       "property": "Walnut Hill"
     },
     "Pelican Bay": {
@@ -91,7 +91,7 @@
       "property": "Jefferson Arms Apts"
     },
     "River Point Apts": {
-      "region": "Region 1",
+      "region": "Region 2",
       "property": "River Pointe"
     },
     "Silver Springs Terrace": {

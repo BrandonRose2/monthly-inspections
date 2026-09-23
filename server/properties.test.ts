@@ -3,7 +3,7 @@ import {
   applyNamingTemplate, buildPreDueReminders, CONTACT_BY_PROPERTY, CONTACTS, LEGACY_PROPERTY_NAMES, mappingHealth, monthRange,
   NOT_ON_MYLONEWORKERS, pdfFileName, REGIONS, TOTAL_PROPERTIES,
 } from "@shared/properties";
-import { renameStatements } from "./schema-setup";
+import { regionMoveStatements, renameStatements } from "./schema-setup";
 
 const all = REGIONS.flatMap(r => r.properties);
 
@@ -19,12 +19,16 @@ describe("shared properties", () => {
   });
 
   it("lists exactly the unmapped properties", () => {
-    expect(mappingHealth().filter(p => !p.mapped).map(p => p.property)).toEqual(NOT_ON_MYLONEWORKERS);
+    expect(mappingHealth().filter(p => !p.mapped).map(p => p.property).sort()).toEqual([...NOT_ON_MYLONEWORKERS].sort());
   });
 
-  it("uses the Notion regional managers", () => {
-    expect(CONTACT_BY_PROPERTY["Walnut Hill"]).toMatchObject({ region: "Region 5", regionalManager: "Johann Armstead" });
-    expect(CONTACT_BY_PROPERTY["River Pointe"]).toMatchObject({ region: "Region 4", regionalEmail: "blake@apartmentcorp.com" });
+  it("uses the Property Directory regions for contacts too", () => {
+    expect(REGIONS.map(r => [r.name, r.properties.length])).toEqual([["Region 1", 10], ["Region 2", 7], ["Region 3", 13], ["Region 4", 11]]);
+    expect(CONTACT_BY_PROPERTY["Walnut Hill"]).toMatchObject({ region: "Region 1", regionalManager: "JR Rolon" });
+    expect(CONTACT_BY_PROPERTY["River Pointe"]).toMatchObject({ region: "Region 2", regionalEmail: "leslie@apartmentcorp.com" });
+    expect(CONTACT_BY_PROPERTY["Arbor Crest"]).toMatchObject({ region: "Region 3", regionalManager: "Ginger Positerry" });
+    for (const c of CONTACTS) expect(REGIONS.find(r => r.name === c.region)!.properties).toContain(c.property);
+    expect(regionMoveStatements()).toHaveLength(TOTAL_PROPERTIES);
     expect(CONTACT_BY_PROPERTY["New Wilmington Arms"]).toMatchObject({ manager: "Jose Gomez", email: "wilmington@apartmentcorp.com" });
   });
 });
@@ -36,15 +40,16 @@ describe("pre-due reminders", () => {
   it("groups outstanding properties by regional manager and skips completed ones", () => {
     const drafts = buildPreDueReminders(done(all.filter(p => !["Walnut Hill", "Lexington", "Arbor Crest", "Holiday Apts"].includes(p))), "September 2026");
     const by = Object.fromEntries(drafts.map(d => [d.regionalManager, d]));
-    expect(Object.keys(by).sort()).toEqual(["JR Rolon", "Johann Armstead", "Leslie Rolon"]);
+    expect(Object.keys(by).sort()).toEqual(["Ginger Positerry", "JR Rolon", "Leslie Rolon"]);
 
     expect(by["JR Rolon"].to).toBe("jrrolon@apartmentcorp.com");
     expect(by["JR Rolon"].cc).toEqual(["leslie@apartmentcorp.com", "mam@22.bz", "Robert@ApartmentCorp.com", "Todd@menowitz.com", "Ethan@apartmentcorp.com"]);
     expect(by["JR Rolon"].body).toMatch(/^Dear JR & Leslie,/);
-    expect(by["JR Rolon"].body).toContain("• Arbor Crest — Erica Finch (Ext. 261)\n• Holiday Apts — Arlene Vinson (Ext. 235)");
+    expect(by["JR Rolon"].body).toContain("• Holiday Apts — Arlene Vinson (Ext. 235)\n• Walnut Hill — Manager (Ext. 267)");
 
-    expect(by["Johann Armstead"].body).toMatch(/^Dear Johann,/);
-    expect(by["Johann Armstead"].body).toContain("the following inspection has not yet been marked complete");
+    expect(by["Ginger Positerry"].body).toMatch(/^Dear Ginger,/);
+    expect(by["Ginger Positerry"].body).toContain("• Arbor Crest — Erica Finch (Ext. 261)");
+    expect(by["Ginger Positerry"].body).toContain("the following inspection has not yet been marked complete");
     expect(by["Leslie Rolon"].body).toContain("• Lexington — Manager (Ext. 239)");
     expect(by["Leslie Rolon"].subject).toBe("Pre-Due Inspection Reminder — September 2026 — Action Needed by the 21st");
   });
