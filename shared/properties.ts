@@ -140,11 +140,28 @@ export const REGIONAL_OVERRIDES: Record<string, { regionalManager: string; greet
   "Region 1": { regionalManager: "JR Rolon", greeting: "JR & Leslie", to: "jrrolon@apartmentcorp.com", cc: ["leslie@apartmentcorp.com", ...REMINDER_CC] },
 };
 
+/**
+ * Properties whose reminders go to someone other than their region's manager.
+ * Walnut Hill, Silver Springs and Thomasville: to Leslie, CC Johann (Brandon, Sept 2026).
+ */
+export const PROPERTY_REMINDER_OVERRIDES: { key: string; properties: string[]; regionalManager: string; greeting: string; to: string; cc: string[] }[] = [
+  {
+    key: "leslie-johann",
+    properties: ["Walnut Hill", "Silver Springs", "Thomasville"],
+    regionalManager: "Leslie Rolon",
+    greeting: "Leslie",
+    to: "leslie@apartmentcorp.com",
+    cc: ["johann@apartmentcorp.com", ...REMINDER_CC],
+  },
+];
+
 export interface ReminderDraft {
   to: string;
   cc: string[];
   regionalManager: string;
   region: string;
+  /** Unique per draft (a region, or a property override's key). */
+  key: string;
   properties: PropertyContact[];
   subject: string;
   body: string;
@@ -166,8 +183,11 @@ export function buildPreDueReminders(
       if (s?.checked === true && s?.xed !== true) continue;
       const contact = CONTACT_BY_PROPERTY[property];
       if (!contact) continue;
-      const o = REGIONAL_OVERRIDES[contact.region];
-      const g = groups.get(contact.region) ?? {
+      const special = PROPERTY_REMINDER_OVERRIDES.find(x => x.properties.includes(property));
+      const o = special ?? REGIONAL_OVERRIDES[contact.region];
+      const key = special?.key ?? contact.region;
+      const g = groups.get(key) ?? {
+        key,
         region: contact.region,
         regionalManager: o?.regionalManager ?? contact.regionalManager,
         to: o?.to ?? contact.regionalEmail,
@@ -176,7 +196,7 @@ export function buildPreDueReminders(
         properties: [],
       };
       g.properties.push(contact);
-      groups.set(contact.region, g);
+      groups.set(key, g);
     }
   }
   return Array.from(groups.values())
@@ -189,7 +209,7 @@ export function buildPreDueReminders(
         body: `Dear ${greeting},\n\nThis is a courtesy heads-up that monthly property inspections are due on the 21st of ${monthLabel}. As of today, the following ${plural ? "inspections have" : "inspection has"} not yet been marked complete in the Monthly Inspections portal:\n\n${list}\n\nPlease follow up with the applicable property manager${plural ? "s" : ""} and ensure each inspection is completed and documented by the monthly deadline. If an inspection has already been completed, please have the manager confirm the entry is reflected in MyLoneWorkers.\n\nPLEASE CONFIRM RECEIPT OF THIS EMAIL.\n\nThank you for your attention to this.\n\nBest regards,\nBrandon Rose\nSpecial Projects\nApartmentCorp\nBrandon@ApartmentCorp.com`,
       };
     })
-    .sort((a, b) => a.regionalManager.localeCompare(b.regionalManager));
+    .sort((a, b) => a.regionalManager.localeCompare(b.regionalManager) || a.region.localeCompare(b.region));
 }
 
 // ── Naming conventions ───────────────────────────────────────────────────────

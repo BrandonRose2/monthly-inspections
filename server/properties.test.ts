@@ -39,19 +39,27 @@ describe("pre-due reminders", () => {
 
   it("groups outstanding properties by regional manager and skips completed ones", () => {
     const drafts = buildPreDueReminders(done(all.filter(p => !["Walnut Hill", "Lexington", "Arbor Crest", "Holiday Apts"].includes(p))), "September 2026");
-    const by = Object.fromEntries(drafts.map(d => [d.regionalManager, d]));
-    expect(Object.keys(by).sort()).toEqual(["Ginger Positerry", "JR Rolon", "Leslie Rolon"]);
+    const by = Object.fromEntries(drafts.filter(d => d.key === d.region).map(d => [d.regionalManager, d]));
+    expect(drafts.map(d => d.key).sort()).toEqual(["Region 1", "Region 2", "Region 3", "leslie-johann"]);
 
     expect(by["JR Rolon"].to).toBe("jrrolon@apartmentcorp.com");
     expect(by["JR Rolon"].cc).toEqual(["leslie@apartmentcorp.com", "mam@22.bz", "Robert@ApartmentCorp.com", "Todd@menowitz.com", "Ethan@apartmentcorp.com"]);
     expect(by["JR Rolon"].body).toMatch(/^Dear JR & Leslie,/);
-    expect(by["JR Rolon"].body).toContain("• Holiday Apts — Arlene Vinson (Ext. 235)\n• Walnut Hill — Manager (Ext. 267)");
+    expect(by["JR Rolon"].body).toContain("• Holiday Apts — Arlene Vinson (Ext. 235)");
+    expect(by["JR Rolon"].body).not.toContain("Walnut Hill");
 
     expect(by["Ginger Positerry"].body).toMatch(/^Dear Ginger,/);
     expect(by["Ginger Positerry"].body).toContain("• Arbor Crest — Erica Finch (Ext. 261)");
     expect(by["Ginger Positerry"].body).toContain("the following inspection has not yet been marked complete");
-    expect(by["Leslie Rolon"].body).toContain("• Lexington — Manager (Ext. 239)");
-    expect(by["Leslie Rolon"].subject).toBe("Pre-Due Inspection Reminder — September 2026 — Action Needed by the 21st");
+    const region2 = drafts.find(d => d.key === "Region 2")!;
+    expect(region2.body).toContain("• Lexington — Manager (Ext. 239)");
+    expect(region2.cc).not.toContain("johann@apartmentcorp.com");
+    const walnut = drafts.find(d => d.key === "leslie-johann")!;
+    expect(walnut).toMatchObject({ to: "leslie@apartmentcorp.com", region: "Region 1" });
+    expect(walnut.cc).toEqual(["johann@apartmentcorp.com", "mam@22.bz", "Robert@ApartmentCorp.com", "Todd@menowitz.com", "Ethan@apartmentcorp.com"]);
+    expect(walnut.body).toMatch(/^Dear Leslie,/);
+    expect(walnut.properties.map(p => p.property)).toEqual(["Walnut Hill"]);
+    expect(region2.subject).toBe("Pre-Due Inspection Reminder — September 2026 — Action Needed by the 21st");
   });
 
   it("still reminds for a property marked both ✓ and ✗", () => {

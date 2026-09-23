@@ -485,7 +485,7 @@ export function preDueReportSpec(drafts: ReminderDraft[], monthLabel: string) {
     title: "Pre-Due Inspection Reminders",
     subtitle: `${monthLabel} · Due the 21st · ${drafts.reduce((n, d) => n + d.properties.length, 0)} properties not yet complete`,
     sections: drafts.map(d => ({
-      title: `${d.regionalManager} — ${d.region}`,
+      title: `${d.regionalManager} — ${d.region}${d.key === d.region ? "" : ` (CC ${d.cc[0]})`}`,
       headers: ["Property", "Manager", "Ext.", "Email"],
       widths: [3, 3, 1, 4],
       rows: d.properties.map(p => [p.property, p.manager || "—", p.ext || "", p.email || "—"]),
@@ -543,10 +543,10 @@ export function PreDueModal({ status, monthLabel, onClose }: { status: Status; m
         <div className="flex min-h-[420px]">
           <div className="w-56 flex-shrink-0 border-r border-gray-200 bg-gray-50 overflow-y-auto">
             {drafts.map((x, i) => (
-              <button key={x.region} onClick={() => setActive(i)}
+              <button key={x.key} onClick={() => setActive(i)}
                 className={`w-full text-left px-4 py-3 border-b border-gray-100 ${i === active ? "bg-[#1e2d4a] text-white" : "hover:bg-gray-100 text-gray-700"}`}>
                 <div className="font-medium text-sm truncate">{x.regionalManager}</div>
-                <div className={`text-xs mt-0.5 ${i === active ? "text-blue-200" : "text-gray-400"}`}>{x.region} · {x.properties.length} propert{x.properties.length === 1 ? "y" : "ies"}</div>
+                <div className={`text-xs mt-0.5 ${i === active ? "text-blue-200" : "text-gray-400"}`}>{x.key === x.region ? x.region : `${x.region} · CC ${x.cc[0]?.split("@")[0]}`} · {x.properties.length} propert{x.properties.length === 1 ? "y" : "ies"}</div>
               </button>
             ))}
           </div>
