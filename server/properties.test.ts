@@ -62,6 +62,19 @@ describe("pre-due reminders", () => {
     expect(region2.subject).toBe("Pre-Due Inspection Reminder — September 2026 — Action Needed by the 21st");
   });
 
+  it("sends Walnut Hill, Silver Springs, Thomasville, Bayou Pointe and North Pointe to Leslie, CC Johann", () => {
+    const drafts = buildPreDueReminders({}, "October 2026");
+    const g = drafts.find(d => d.key === "leslie-johann")!;
+    expect(g.properties.map(p => p.property).sort()).toEqual(["Bayou Pointe", "North Pointe", "Silver Springs", "Thomasville", "Walnut Hill"]);
+    expect(g.region).toBe("Region 1 & Region 3");
+    expect(g.body).toContain("• Bayou Pointe — Ada Vu (Ext. 298)");
+    expect(g.body).toContain("• North Pointe — Johann Armstead (Ext. 297)");
+    expect(g.body).toContain("• Walnut Hill — Johann Armstead (Ext. 267)");
+    const ginger = drafts.find(d => d.key === "Region 3")!;
+    expect(ginger.properties.map(p => p.property)).not.toContain("Bayou Pointe");
+    expect(drafts.flatMap(d => d.properties).length).toBe(41);
+  });
+
   it("still reminds for a property marked both ✓ and ✗", () => {
     const status = { "Region 2::Crossroads": { checked: true, xed: true } };
     const drafts = buildPreDueReminders({ ...done(all.filter(p => p !== "Crossroads")), ...status }, "September 2026");

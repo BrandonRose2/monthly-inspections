@@ -104,12 +104,12 @@ export const CONTACTS: PropertyContact[] = [
   c("Holiday Apts", "Arlene Vinson", "holiday@apartmentcorp.com", "235"),
   c("La Promesa", "Ashley Clay", "lapromesa@apartmentcorp.com", "269"),
   c("Lexington", "", "lexingtonasst@apartmentcorp.com", "239"),
-  c("Walnut Hill", "", "walnut@apartmentcorp.com", "267"),
-  c("Bayou Pointe", "", "bayou@apartmentcorp.com", "298"),
+  c("Walnut Hill", "Johann Armstead", "walnut@apartmentcorp.com", "267"),
+  c("Bayou Pointe", "Ada Vu", "bayou@apartmentcorp.com", "298"),
   c("The Gates on Manhattan", "Lindgret Celestine", "lindgret@apartmentcorp.com", "284"),
   c("Howell Place", "Valencia Patterson", "howell@apartmentcorp.com", "259"),
   c("Marrero 3", "Ketorah Parks", "rubystarmanager@apartmentcorp.com", "283"),
-  c("North Pointe", "", "northpointe@apartmentcorp.com", "297"),
+  c("North Pointe", "Johann Armstead", "northpointe@apartmentcorp.com", "297"),
   c("Pelican Bay", "Dequanta Sutherland", "pelican@apartmentcorp.com", "257"),
   c("Pirates Bend", "Valencia Patterson", "pirates@apartmentcorp.com", "260"),
   c("Ruby Diamond", "Ketorah Parks", "rubystarmanager@apartmentcorp.com", "286"),
@@ -142,12 +142,13 @@ export const REGIONAL_OVERRIDES: Record<string, { regionalManager: string; greet
 
 /**
  * Properties whose reminders go to someone other than their region's manager.
- * Walnut Hill, Silver Springs and Thomasville: to Leslie, CC Johann (Brandon, Sept 2026).
+ * Walnut Hill, Silver Springs, Thomasville, Bayou Pointe and North Pointe:
+ * to Leslie, CC Johann (Brandon, Sept 2026).
  */
 export const PROPERTY_REMINDER_OVERRIDES: { key: string; properties: string[]; regionalManager: string; greeting: string; to: string; cc: string[] }[] = [
   {
     key: "leslie-johann",
-    properties: ["Walnut Hill", "Silver Springs", "Thomasville"],
+    properties: ["Walnut Hill", "Silver Springs", "Thomasville", "Bayou Pointe", "North Pointe"],
     regionalManager: "Leslie Rolon",
     greeting: "Leslie",
     to: "leslie@apartmentcorp.com",
@@ -196,6 +197,7 @@ export function buildPreDueReminders(
         properties: [],
       };
       g.properties.push(contact);
+      if (!g.region.split(" & ").includes(contact.region)) g.region = `${g.region} & ${contact.region}`;
       groups.set(key, g);
     }
   }

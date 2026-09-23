@@ -73,12 +73,12 @@ var CONTACTS = [
   c("Holiday Apts", "Arlene Vinson", "holiday@apartmentcorp.com", "235"),
   c("La Promesa", "Ashley Clay", "lapromesa@apartmentcorp.com", "269"),
   c("Lexington", "", "lexingtonasst@apartmentcorp.com", "239"),
-  c("Walnut Hill", "", "walnut@apartmentcorp.com", "267"),
-  c("Bayou Pointe", "", "bayou@apartmentcorp.com", "298"),
+  c("Walnut Hill", "Johann Armstead", "walnut@apartmentcorp.com", "267"),
+  c("Bayou Pointe", "Ada Vu", "bayou@apartmentcorp.com", "298"),
   c("The Gates on Manhattan", "Lindgret Celestine", "lindgret@apartmentcorp.com", "284"),
   c("Howell Place", "Valencia Patterson", "howell@apartmentcorp.com", "259"),
   c("Marrero 3", "Ketorah Parks", "rubystarmanager@apartmentcorp.com", "283"),
-  c("North Pointe", "", "northpointe@apartmentcorp.com", "297"),
+  c("North Pointe", "Johann Armstead", "northpointe@apartmentcorp.com", "297"),
   c("Pelican Bay", "Dequanta Sutherland", "pelican@apartmentcorp.com", "257"),
   c("Pirates Bend", "Valencia Patterson", "pirates@apartmentcorp.com", "260"),
   c("Ruby Diamond", "Ketorah Parks", "rubystarmanager@apartmentcorp.com", "286"),
@@ -106,7 +106,7 @@ var REGIONAL_OVERRIDES = {
 var PROPERTY_REMINDER_OVERRIDES = [
   {
     key: "leslie-johann",
-    properties: ["Walnut Hill", "Silver Springs", "Thomasville"],
+    properties: ["Walnut Hill", "Silver Springs", "Thomasville", "Bayou Pointe", "North Pointe"],
     regionalManager: "Leslie Rolon",
     greeting: "Leslie",
     to: "leslie@apartmentcorp.com",
@@ -1562,6 +1562,76 @@ function registerIngestUpload(app2) {
   );
 }
 
+// server/_core/pinGate.ts
+import crypto from "crypto";
+import { parse as parseCookies } from "cookie";
+var PIN_COOKIE = "mi_pin";
+var MAX_AGE_MS = 30 * 24 * 60 * 60 * 1e3;
+var MAX_FAILURES = 5;
+var LOCKOUT_MS = 15 * 60 * 1e3;
+var failures = /* @__PURE__ */ new Map();
+function pin() {
+  return (process.env.PORTAL_PIN ?? "").trim();
+}
+function signature(p) {
+  const secret = process.env.PIN_SECRET || process.env.INGEST_TOKEN || "monthly-inspections";
+  return crypto.createHmac("sha256", secret).update(`portal-pin:${p}`).digest("base64url");
+}
+function safeEqual(a, b) {
+  const x = Buffer.from(a);
+  const y = Buffer.from(b);
+  return x.length === y.length && crypto.timingSafeEqual(x, y);
+}
+function hasValidPinCookie(req) {
+  const p = pin();
+  if (!p) return true;
+  const value = parseCookies(req.headers.cookie ?? "")[PIN_COOKIE];
+  return Boolean(value) && safeEqual(value, signature(p));
+}
+function clientKey(req) {
+  return String(req.headers["x-forwarded-for"] ?? req.socket.remoteAddress ?? "unknown").split(",")[0].trim();
+}
+function requirePin(req, res, next) {
+  if (!pin() || hasValidPinCookie(req) || isValidIngestToken(req.headers.authorization)) return next();
+  res.status(401).json({ error: "PIN required" });
+}
+function registerPinGate(app2) {
+  app2.get("/api/pin/status", (req, res) => {
+    res.json({ required: Boolean(pin()), unlocked: hasValidPinCookie(req) });
+  });
+  app2.post("/api/pin", (req, res) => {
+    const p = pin();
+    if (!p) return res.json({ unlocked: true });
+    const key = clientKey(req);
+    const now = Date.now();
+    const f = failures.get(key);
+    if (f && f.until > now) {
+      return res.status(429).json({ error: `Too many wrong PINs. Try again in ${Math.ceil((f.until - now) / 6e4)} minutes.` });
+    }
+    const given = String(req.body?.pin ?? "").trim();
+    if (!safeEqual(given, p)) {
+      const count = (f && f.until <= now && f.count >= MAX_FAILURES ? 0 : f?.count ?? 0) + 1;
+      failures.set(key, { count, until: count >= MAX_FAILURES ? now + LOCKOUT_MS : 0 });
+      return res.status(401).json({ error: count >= MAX_FAILURES ? "Too many wrong PINs. Try again in 15 minutes." : "Wrong PIN." });
+    }
+    failures.delete(key);
+    res.cookie(PIN_COOKIE, signature(p), {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: req.secure || req.headers["x-forwarded-proto"] === "https",
+      maxAge: MAX_AGE_MS,
+      path: "/"
+    });
+    res.json({ unlocked: true });
+  });
+  app2.post("/api/pin/lock", (_req, res) => {
+    res.clearCookie(PIN_COOKIE, { path: "/" });
+    res.json({ unlocked: false });
+  });
+  app2.use("/api/trpc", requirePin);
+  app2.use("/files", requirePin);
+}
+
 // server/schema-setup.ts
 import { sql } from "drizzle-orm";
 var SCHEMA_STATEMENTS = [
@@ -1639,6 +1709,7 @@ void ensureSchema();
 var app = express2();
 app.use(express2.json({ limit: "50mb" }));
 app.use(express2.urlencoded({ limit: "50mb", extended: true }));
+registerPinGate(app);
 registerStorageProxy(app);
 registerIngestUpload(app);
 registerOAuthRoutes(app);

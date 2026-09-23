@@ -16,6 +16,7 @@ import { createContext } from "./_core/context";
 import { registerOAuthRoutes } from "./_core/oauth";
 import { registerStorageProxy } from "./_core/storageProxy";
 import { registerIngestUpload } from "./_core/ingestUpload";
+import { registerPinGate } from "./_core/pinGate";
 import { ensureSchema } from "./schema-setup";
 
 void ensureSchema();
@@ -26,6 +27,7 @@ const app = express();
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
+registerPinGate(app);
 registerStorageProxy(app);
 registerIngestUpload(app);
 registerOAuthRoutes(app);
