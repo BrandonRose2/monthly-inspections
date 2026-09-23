@@ -37,42 +37,33 @@ describe("pre-due reminders", () => {
   const done = (props: string[]) =>
     Object.fromEntries(REGIONS.flatMap(r => r.properties.filter(p => props.includes(p)).map(p => [`${r.name}::${p}`, { checked: true, xed: false }])));
 
-  it("groups outstanding properties by regional manager and skips completed ones", () => {
-    const drafts = buildPreDueReminders(done(all.filter(p => !["Walnut Hill", "Lexington", "Arbor Crest", "Holiday Apts"].includes(p))), "September 2026");
-    const by = Object.fromEntries(drafts.filter(d => d.key === d.region).map(d => [d.regionalManager, d]));
-    expect(drafts.map(d => d.key).sort()).toEqual(["Region 1", "Region 2", "Region 3", "leslie-johann"]);
-
-    expect(by["JR Rolon"].to).toBe("jrrolon@apartmentcorp.com");
-    expect(by["JR Rolon"].cc).toEqual(["leslie@apartmentcorp.com", "mam@22.bz", "Robert@ApartmentCorp.com", "Todd@menowitz.com", "Ethan@apartmentcorp.com"]);
-    expect(by["JR Rolon"].body).toMatch(/^Dear JR & Leslie,/);
-    expect(by["JR Rolon"].body).toContain("• Holiday Apts — Arlene Vinson (Ext. 235)");
-    expect(by["JR Rolon"].body).not.toContain("Walnut Hill");
-
-    expect(by["Ginger Positerry"].body).toMatch(/^Dear Ginger,/);
-    expect(by["Ginger Positerry"].body).toContain("• Arbor Crest — Erica Finch (Ext. 261)");
-    expect(by["Ginger Positerry"].body).toContain("the following inspection has not yet been marked complete");
-    const region2 = drafts.find(d => d.key === "Region 2")!;
-    expect(region2.body).toContain("• Lexington — Manager (Ext. 239)");
-    expect(region2.cc).not.toContain("johann@apartmentcorp.com");
-    const walnut = drafts.find(d => d.key === "leslie-johann")!;
-    expect(walnut).toMatchObject({ to: "leslie@apartmentcorp.com", region: "Region 1" });
-    expect(walnut.cc).toEqual(["johann@apartmentcorp.com", "mam@22.bz", "Robert@ApartmentCorp.com", "Todd@menowitz.com", "Ethan@apartmentcorp.com"]);
-    expect(walnut.body).toMatch(/^Dear Leslie,/);
-    expect(walnut.properties.map(p => p.property)).toEqual(["Walnut Hill"]);
-    expect(region2.subject).toBe("Pre-Due Inspection Reminder — September 2026 — Action Needed by the 21st");
+  it("sends one reminder per region, in order, to the four regional managers only", () => {
+    const drafts = buildPreDueReminders({}, "October 2026");
+    expect(drafts.map(d => [d.region, d.regionalManager, d.to])).toEqual([
+      ["Region 1", "JR Rolon", "jrrolon@apartmentcorp.com"],
+      ["Region 2", "Leslie Rolon", "leslie@apartmentcorp.com"],
+      ["Region 3", "Ginger Positerry", "ginger@apartmentcorp.com"],
+      ["Region 4", "Blake Weddington", "blake@apartmentcorp.com"],
+    ]);
+    const standard = ["mam@22.bz", "Robert@ApartmentCorp.com", "Todd@menowitz.com", "Ethan@apartmentcorp.com"];
+    expect(drafts[0].cc).toEqual(["leslie@apartmentcorp.com", ...standard]);
+    for (const d of drafts.slice(1)) expect(d.cc).toEqual(standard);
+    expect(drafts.flatMap(d => d.cc)).not.toContain("johann@apartmentcorp.com");
+    expect(drafts[0].body).toMatch(/^Dear JR & Leslie,/);
+    expect(drafts[1].body).toMatch(/^Dear Leslie,/);
+    expect(drafts[2].body).toMatch(/^Dear Ginger,/);
+    expect(drafts[3].body).toMatch(/^Dear Blake,/);
+    for (const d of drafts) expect(d.properties.map(p => p.property)).toEqual(REGIONS.find(r => r.name === d.region)!.properties);
+    expect(drafts[0].body).toContain("• Walnut Hill — Johann Armstead (Ext. 267)");
+    expect(drafts[2].body).toContain("• Bayou Pointe — Ada Vu (Ext. 298)");
+    expect(drafts[1].subject).toBe("Pre-Due Inspection Reminder — October 2026 — Action Needed by the 21st");
   });
 
-  it("sends Walnut Hill, Silver Springs, Thomasville, Bayou Pointe and North Pointe to Leslie, CC Johann", () => {
-    const drafts = buildPreDueReminders({}, "October 2026");
-    const g = drafts.find(d => d.key === "leslie-johann")!;
-    expect(g.properties.map(p => p.property).sort()).toEqual(["Bayou Pointe", "North Pointe", "Silver Springs", "Thomasville", "Walnut Hill"]);
-    expect(g.region).toBe("Region 1 & Region 3");
-    expect(g.body).toContain("• Bayou Pointe — Ada Vu (Ext. 298)");
-    expect(g.body).toContain("• North Pointe — Johann Armstead (Ext. 297)");
-    expect(g.body).toContain("• Walnut Hill — Johann Armstead (Ext. 267)");
-    const ginger = drafts.find(d => d.key === "Region 3")!;
-    expect(ginger.properties.map(p => p.property)).not.toContain("Bayou Pointe");
-    expect(drafts.flatMap(d => d.properties).length).toBe(41);
+  it("skips completed properties and regions with nothing outstanding", () => {
+    const drafts = buildPreDueReminders(done(all.filter(p => !["Lexington", "Arbor Crest"].includes(p))), "September 2026");
+    expect(drafts.map(d => d.region)).toEqual(["Region 2", "Region 3"]);
+    expect(drafts[0].body).toContain("the following inspection has not yet been marked complete");
+    expect(drafts[0].properties.map(p => p.property)).toEqual(["Lexington"]);
   });
 
   it("still reminds for a property marked both ✓ and ✗", () => {

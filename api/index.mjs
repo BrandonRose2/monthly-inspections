@@ -103,16 +103,6 @@ var REMINDER_CC = ["mam@22.bz", "Robert@ApartmentCorp.com", "Todd@menowitz.com",
 var REGIONAL_OVERRIDES = {
   "Region 1": { regionalManager: "JR Rolon", greeting: "JR & Leslie", to: "jrrolon@apartmentcorp.com", cc: ["leslie@apartmentcorp.com", ...REMINDER_CC] }
 };
-var PROPERTY_REMINDER_OVERRIDES = [
-  {
-    key: "leslie-johann",
-    properties: ["Walnut Hill", "Silver Springs", "Thomasville", "Bayou Pointe", "North Pointe"],
-    regionalManager: "Leslie Rolon",
-    greeting: "Leslie",
-    to: "leslie@apartmentcorp.com",
-    cc: ["johann@apartmentcorp.com", ...REMINDER_CC]
-  }
-];
 var DEFAULT_NAMING = {
   runTemplate: "Scraper Run \u2014 {start} to {end}",
   summaryPdfTemplate: "Inspection-Summary-{month}",
