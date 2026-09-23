@@ -1,5 +1,5 @@
 // server/vercel-entry.ts
-import express from "express";
+import express2 from "express";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 
 // shared/const.ts
@@ -298,15 +298,17 @@ var machineProcedure = t.procedure.use(
         message: "INGEST_TOKEN is not configured on the server"
       });
     }
-    const header = ctx.req.headers.authorization ?? "";
-    const presented = header.startsWith("Bearer ") ? header.slice(7) : "";
-    const ok = presented.length === expected.length && presented.split("").reduce((acc, ch, i) => acc | ch.charCodeAt(0) ^ expected.charCodeAt(i), 0) === 0;
+    const ok = isValidIngestToken(ctx.req.headers.authorization, expected);
     if (!ok) {
       throw new TRPCError2({ code: "UNAUTHORIZED", message: "Invalid ingest token" });
     }
     return next({ ctx });
   })
 );
+function isValidIngestToken(header, expected = process.env.INGEST_TOKEN ?? "") {
+  const presented = header?.startsWith("Bearer ") ? header.slice(7) : "";
+  return expected.length > 0 && presented.length === expected.length && presented.split("").reduce((acc, ch, i) => acc | ch.charCodeAt(0) ^ expected.charCodeAt(i), 0) === 0;
+}
 
 // server/_core/systemRouter.ts
 var systemRouter = router({
@@ -901,11 +903,18 @@ var appRouter = router({
         note: z2.string().max(2e3),
         fileName: z2.string().optional(),
         fileBase64: z2.string().optional(),
-        fileSize: z2.number().optional()
+        fileSize: z2.number().optional(),
+        // A PDF already stored via POST /api/ingest/pdf (used for large reports).
+        pdfUrl: z2.string().max(512).optional()
       })
     ).mutation(async ({ input }) => {
       let pdf = null;
-      if (input.fileBase64 && input.fileName) {
+      if (input.pdfUrl && input.fileName) {
+        if (!input.pdfUrl.startsWith(`${FILES_ROUTE}/inspections/`) && !/^https:\/\/[^/]+\/inspections\//.test(input.pdfUrl)) {
+          throw new TRPCError3({ code: "BAD_REQUEST", message: "pdfUrl must come from /api/ingest/pdf" });
+        }
+        pdf = { name: input.fileName, key: input.pdfUrl, size: input.fileSize ?? 0, uploadedAt: (/* @__PURE__ */ new Date()).toISOString() };
+      } else if (input.fileBase64 && input.fileName) {
         const buffer = Buffer.from(input.fileBase64, "base64");
         if (buffer.subarray(0, 4).toString() !== "%PDF") {
           throw new Error("fileBase64 is not a PDF");
@@ -1478,6 +1487,44 @@ function registerStorageProxy(app2) {
   });
 }
 
+// server/_core/ingestUpload.ts
+import express from "express";
+var INGEST_PDF_ROUTE = "/api/ingest/pdf";
+var MAX_INGEST_PDF_BYTES = 300 * 1024 * 1024;
+function registerIngestUpload(app2) {
+  app2.post(
+    INGEST_PDF_ROUTE,
+    (req, res, next) => {
+      if (!process.env.INGEST_TOKEN) return res.status(500).json({ error: "INGEST_TOKEN is not configured on the server" });
+      if (!isValidIngestToken(req.headers.authorization)) return res.status(401).json({ error: "Invalid ingest token" });
+      next();
+    },
+    express.raw({ type: "application/pdf", limit: MAX_INGEST_PDF_BYTES }),
+    async (req, res) => {
+      const monthKey = String(req.query.monthKey ?? "");
+      const property = String(req.query.property ?? "");
+      const fileName = String(req.query.fileName ?? "");
+      if (!/^\d{4}-\d{2}$/.test(monthKey) || !property || !fileName) {
+        return res.status(400).json({ error: "monthKey, property and fileName are required" });
+      }
+      const body = req.body;
+      if (!Buffer.isBuffer(body) || body.subarray(0, 4).toString() !== "%PDF") {
+        return res.status(400).json({ error: "Body must be a PDF sent as application/pdf" });
+      }
+      try {
+        const safeProperty = property.replace(/[^a-zA-Z0-9]/g, "_");
+        const safeFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
+        const key = `inspections/${monthKey}/${safeProperty}/${Date.now()}_${safeFileName}`;
+        const { url } = await storagePut(key, body, "application/pdf");
+        res.json({ url, size: body.length });
+      } catch (err) {
+        console.error("[IngestUpload] storage failed:", err);
+        res.status(502).json({ error: "Could not store the PDF" });
+      }
+    }
+  );
+}
+
 // server/schema-setup.ts
 import { sql } from "drizzle-orm";
 var SCHEMA_STATEMENTS = [
@@ -1545,10 +1592,11 @@ async function ensureSchema() {
 
 // server/vercel-entry.ts
 void ensureSchema();
-var app = express();
-app.use(express.json({ limit: "50mb" }));
-app.use(express.urlencoded({ limit: "50mb", extended: true }));
+var app = express2();
+app.use(express2.json({ limit: "50mb" }));
+app.use(express2.urlencoded({ limit: "50mb", extended: true }));
 registerStorageProxy(app);
+registerIngestUpload(app);
 registerOAuthRoutes(app);
 app.use(
   "/api/trpc",

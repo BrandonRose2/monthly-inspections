@@ -73,7 +73,29 @@ async function borrowToken() {
   return getApiToken({ headless: CONFIG.headless, diagnosticsDir: CONFIG.diagnosticsDir });
 }
 
+// Large forms reports go up as raw bytes first (no base64, no JSON size limit).
+// Returns null when the portal predates that route, so the caller falls back.
+async function uploadPdf({ monthKey, property, pdf }) {
+  const qs = new URLSearchParams({ monthKey, property, fileName: pdf.fileName });
+  const res = await fetch(`${CONFIG.portalBaseUrl}/api/ingest/pdf?${qs}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/pdf', authorization: `Bearer ${CONFIG.ingestToken}` },
+    body: pdf.buffer,
+  });
+  if (res.status === 404) return null;
+  const text = await res.text();
+  if (!res.ok) throw new Error(`PDF upload failed (${res.status}, ${(pdf.buffer.length / 1048576).toFixed(1)} MB): ${text.slice(0, 200)}`);
+  return JSON.parse(text).url;
+}
+
 async function fileResult({ monthKey, result, pdf }) {
+  let file = {};
+  if (pdf) {
+    const url = await uploadPdf({ monthKey, property: result.property, pdf });
+    file = url
+      ? { fileName: pdf.fileName, pdfUrl: url, fileSize: pdf.buffer.length }
+      : { fileName: pdf.fileName, fileBase64: pdf.buffer.toString('base64'), fileSize: pdf.buffer.length };
+  }
   const res = await fetch(`${CONFIG.portalBaseUrl}/api/trpc/inspections.ingestInspectionResult`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', authorization: `Bearer ${CONFIG.ingestToken}` },
@@ -85,7 +107,7 @@ async function fileResult({ monthKey, result, pdf }) {
         checked: result.checked,
         xed: result.xed,
         note: result.note,
-        ...(pdf ? { fileName: pdf.fileName, fileBase64: pdf.buffer.toString('base64'), fileSize: pdf.buffer.length } : {}),
+        ...file,
       },
     }),
   });

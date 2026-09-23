@@ -8,7 +8,7 @@ import { machineProcedure, publicProcedure, router } from "./_core/trpc";
 import { createRun, deleteRun, getRun, getSetting, listRuns, listSavedRuns, setSetting, updateRun } from "./db";
 import { dispatchScrape, DispatchError } from "./github";
 import { deleteAllRecords, deleteMonthRecords, getHistorySummary, getMonthRecords, getRepeatOffenders, getSavedMonthKeys, setInspectionResult, upsertInspectionRecord } from "./db";
-import { storagePut } from "./storage";
+import { FILES_ROUTE, storagePut } from "./storage";
 
 const monthKeySchema = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/);
 
@@ -150,11 +150,18 @@ export const appRouter = router({
           fileName: z.string().optional(),
           fileBase64: z.string().optional(),
           fileSize: z.number().optional(),
+          // A PDF already stored via POST /api/ingest/pdf (used for large reports).
+          pdfUrl: z.string().max(512).optional(),
         })
       )
       .mutation(async ({ input }) => {
         let pdf: { name: string; key: string; size: number; uploadedAt: string } | null = null;
-        if (input.fileBase64 && input.fileName) {
+        if (input.pdfUrl && input.fileName) {
+          if (!input.pdfUrl.startsWith(`${FILES_ROUTE}/inspections/`) && !/^https:\/\/[^/]+\/inspections\//.test(input.pdfUrl)) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: "pdfUrl must come from /api/ingest/pdf" });
+          }
+          pdf = { name: input.fileName, key: input.pdfUrl, size: input.fileSize ?? 0, uploadedAt: new Date().toISOString() };
+        } else if (input.fileBase64 && input.fileName) {
           const buffer = Buffer.from(input.fileBase64, "base64");
           if (buffer.subarray(0, 4).toString() !== "%PDF") {
             throw new Error("fileBase64 is not a PDF");

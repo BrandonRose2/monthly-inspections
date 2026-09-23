@@ -61,13 +61,7 @@ export const machineProcedure = t.procedure.use(
       });
     }
 
-    const header = ctx.req.headers.authorization ?? "";
-    const presented = header.startsWith("Bearer ") ? header.slice(7) : "";
-
-    // Constant-length comparison to avoid leaking the token via timing.
-    const ok =
-      presented.length === expected.length &&
-      presented.split("").reduce((acc, ch, i) => acc | (ch.charCodeAt(0) ^ expected.charCodeAt(i)), 0) === 0;
+    const ok = isValidIngestToken(ctx.req.headers.authorization, expected);
 
     if (!ok) {
       throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid ingest token" });
@@ -76,3 +70,14 @@ export const machineProcedure = t.procedure.use(
     return next({ ctx });
   }),
 );
+
+/** Bearer-token check shared by machineProcedure and the raw PDF upload route. */
+export function isValidIngestToken(header: string | undefined, expected = process.env.INGEST_TOKEN ?? "") {
+  const presented = header?.startsWith("Bearer ") ? header.slice(7) : "";
+  // Constant-length comparison to avoid leaking the token via timing.
+  return (
+    expected.length > 0 &&
+    presented.length === expected.length &&
+    presented.split("").reduce((acc, ch, i) => acc | (ch.charCodeAt(0) ^ expected.charCodeAt(i)), 0) === 0
+  );
+}

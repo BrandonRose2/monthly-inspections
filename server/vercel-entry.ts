@@ -15,6 +15,7 @@ import { appRouter } from "./routers";
 import { createContext } from "./_core/context";
 import { registerOAuthRoutes } from "./_core/oauth";
 import { registerStorageProxy } from "./_core/storageProxy";
+import { registerIngestUpload } from "./_core/ingestUpload";
 import { ensureSchema } from "./schema-setup";
 
 void ensureSchema();
@@ -26,6 +27,7 @@ app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
 registerStorageProxy(app);
+registerIngestUpload(app);
 registerOAuthRoutes(app);
 
 app.use(

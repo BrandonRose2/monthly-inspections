@@ -5,6 +5,7 @@ vi.mock("./db", async (orig) => ({
   setInspectionResult: vi.fn(async () => {}),
 }));
 vi.mock("./storage", () => ({
+  FILES_ROUTE: "/files",
   storagePut: vi.fn(async (key: string) => ({ key, url: `https://blob.example/${key}` })),
 }));
 
@@ -71,5 +72,20 @@ describe("inspections.ingestInspectionResult", () => {
     await expect(caller.inspections.ingestInspectionResult({
       ...base, fileName: "x.pdf", fileBase64: Buffer.from("hello").toString("base64"),
     })).rejects.toThrow(/not a PDF/);
+  });
+
+  it("attaches a PDF already uploaded through /api/ingest/pdf", async () => {
+    const caller = appRouter.createCaller(ctx("Bearer test-token-123"));
+    const url = "/files/inspections/2026-09/Crossroads/1_Crossroads_2026-09.pdf";
+    await caller.inspections.ingestInspectionResult({ ...base, property: "Crossroads", fileName: "Crossroads_2026-09.pdf", pdfUrl: url, fileSize: 40_000_000 });
+    expect(storagePut).not.toHaveBeenCalled();
+    expect(setInspectionResult).toHaveBeenCalledWith(expect.objectContaining({
+      pdf: expect.objectContaining({ key: url, size: 40_000_000, name: "Crossroads_2026-09.pdf" }),
+    }));
+  });
+
+  it("refuses a pdfUrl that didn't come from the upload route", async () => {
+    const caller = appRouter.createCaller(ctx("Bearer test-token-123"));
+    await expect(caller.inspections.ingestInspectionResult({ ...base, fileName: "x.pdf", pdfUrl: "https://evil.example/x.pdf" })).rejects.toThrow(/pdfUrl/);
   });
 });

@@ -48,9 +48,22 @@ test('a portal-started range run reports progress for every month and files resu
   assert.deepEqual([...months].sort(), ['2026-08', '2026-09']);
   const brk = filed.find(c => c.json.monthKey === '2026-09' && c.json.property === 'Breckenridge Village');
   assert.equal(brk.json.checked, true);
-  assert.match(brk.json.fileBase64, /chars/);
+  // PDFs go up as raw bytes, then the result points at the stored file.
+  assert.equal(brk.json.fileBase64, undefined);
+  assert.equal(brk.json.pdfUrl, '/files/inspections/2026-09/Breckenridge Village.pdf');
+  const up = calls.find(c => c.procedure === 'upload' && c.json.property === 'Breckenridge Village' && c.json.monthKey === '2026-09');
+  assert.equal(up.json.pdf, '%PDF');
+  assert.equal(up.auth, 'Bearer tok');
   assert.equal(last.total, filed.length);
   assert.equal(last.passed, filed.filter(c => c.json.checked).length);
+});
+
+test('falls back to base64 when the portal has no upload route yet', () => {
+  const { status, calls, stderr } = scrape({ RUN_ID: '4', MONTH: '2026-09', ONLY: 'Breckenridge Village', FAKE_NO_UPLOAD: '1' });
+  assert.equal(status, 0, stderr);
+  const filed = calls.find(c => c.procedure === 'inspections.ingestInspectionResult');
+  assert.match(filed.json.fileBase64, /chars/);
+  assert.equal(filed.json.pdfUrl, undefined);
 });
 
 test('a mapping test files only the chosen properties', () => {
